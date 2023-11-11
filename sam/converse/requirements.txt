@@ -1,0 +1,10 @@
+aws-lambda-powertools[tracer]
+transformers
+
+
+-f https://download.pytorch.org/whl/torch_stable.html
+torch==2.0.0+cpu
+torchvision==0.15.1+cpu
+
+
+

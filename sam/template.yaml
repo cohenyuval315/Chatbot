@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  chatbot
+
+Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
+  Function:
+    Timeout: 600
+    MemorySize: 256
+    Runtime: python3.9
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+        STAGE: dev #Production    
+        POWERTOOLS_SERVICE_NAME: conversation # Powertools for AWS Lambda (Python) env vars: https://awslabs.github.io/aws-lambda-powertools-python/#environment-variables
+        POWERTOOLS_METRICS_NAMESPACE: ServerlessConversation
+        POWERTOOLS_DEV: 'true'
+        POWERTOOLS_DEBUG: 'true'
+        POWERTOOLS_LOGGER_LOG_EVENT : 'true'
+        
+Resources:
+  ConverseFunction:
+    Type: AWS::Serverless::Function     # More info about Function Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html
+    Properties:
+      Handler: lambda_function.lambda_handler
+      CodeUri: converse
+      Description: conversation with chatbot
+      Architectures:
+      - x86_64
+      Tracing: Active
+      Events: # More info about API Event Source: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-property-function-api.html
+        HelloPath:
+          Type: Api           
+          Properties:
+            Path: /hello
+            Method: GET
+        ChatsPath:
+          Type: Api           
+          Properties:
+            Path: /c
+            Method: GET                  
+        NewChatPath:
+          Type: Api           
+          Properties:
+            Path: /c
+            Method: POST
+        ChatPath:
+          Type: Api           
+          Properties:
+            Path: /c/{chat_id}
+            Method: GET                 
+        ConversePath:
+          Type: Api           
+          Properties:
+            Path: /c/{chat_id}
+            Method: PUT
+
+      Tags:
+        LambdaPowertools: python
+
+  WarmUpFunction:
+    Type: AWS::Serverless::Function   
+    Properties:
+      Handler: lambda_function.warm_up_handler 
+      CodeUri: converse 
+      Description: initilize the model to s3
+      Architectures:
+      - x86_64
+      Tracing: Active
+      Events:
+        YourEvent:
+          Type: Api
+          Properties:
+            Path: /
+            Method: GET 
+      Tags:
+        LambdaPowertools: python
+
+
+
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name:
+        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName:
+        Ref: ApplicationResourceGroup
+      AutoConfigurationEnabled: 'true'
+Outputs:
+  HelloWorldApi:
+    Description: API Gateway endpoint URL for Prod environment
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+
+  ConverseFunction:
+    Description: conversation with chatbot Lambda Function ARN
+    Value: !GetAtt ConverseFunction.Arn
+
+  WarmUpFunction:
+    Description: load model chatbot Lambda Function ARN
+    Value: !GetAtt WarmUpFunction.Arn
+
+
