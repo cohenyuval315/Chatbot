@@ -22,150 +22,525 @@ import transformers
 import zipfile
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers import T5Tokenizer, T5ForConditionalGeneration
+import json
+import shutil
+import io
+import botocore
+
+import logging
+from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError,NoCredentialsError
+import uuid
+from datetime import datetime
+
 
 
 # Globals
-s3_bucket = "test-bucket"
-model_name = "google/flan-t5-small"
-model_key = "model_weights"
-tokenizer_key = "model_tokenizer_weights"
-warm_up_key = "warm_up_status.json"
-completed_status_indicator = "completed"
-ongoing_status_indicator = "ongoing"
-fail_status_indicator = "failure"
+# s3_bucket = "test-bucket"
+# model_name = "google/flan-t5-small"
+# model_key = "model_weights"
+# tokenizer_key = "model_tokenizer_weights"
+# warm_up_key = "warm_up_status.json"
+# completed_status_indicator = "completed"
+# ongoing_status_indicator = "ongoing"
+# fail_status_indicator = "failure"
+
+
+
+def get_aws_config():
+    if os.getenv("STAGE") == "local":
+        pass
+    if os.getenv("STAGE") == "dev":
+        pass
+    endpoint_url = "http://172.17.0.2:4566"
+    s3_region = "eu-west-3"
+    s3_conf = {
+        "aws_access_key_id":"test",
+        "aws_secret_access_key":"test",
+        "endpoint_url":endpoint_url,
+        "region_name":s3_region,
+        "verify":False
+    }    
+    return s3_conf
+
+def create_bucket(bucket_name):
+    logger.debug(f"func:create_bucket: creating S3 Bucket '{bucket_name}'.")
+    s3_region = "eu-west-3"
+    try:
+        response = s3.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={
+                'LocationConstraint': s3_region 
+            }
+        )
+        logger.debug(response)
+        logger.debug(f"Bucket '{bucket_name}' created successfully.")
+    except Exception as e:
+        logger.error(f"Error creating bucket: {e}")    
+        return bucket_name
+    
+def clean_bucket(bucket_name):
+    logger.debug(f"func:clean_bucket:cleaning S3 Bucket '{bucket_name}'.")
+    try:
+        objects = s3.list_objects_v2(Bucket=bucket_name).get('Contents', [])
+        for obj in objects:
+            s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
+        logger.debug(f"S3 Bucket '{bucket_name}' all objects deleted successfully.")
+    except NoCredentialsError as e:
+        logger.error(f"Error deleting S3 bucket: {e}")
+    except Exception as e:
+        logger.error(f"Error deleting S3 bucket: {e}")
+
+def delete_bucket(bucket_name):
+    logger.debug(f"func:delete_bucket: deleting S3 Bucket '{bucket_name}'.")
+    clean_bucket(bucket_name)
+    try:
+        s3.delete_bucket(Bucket=bucket_name)
+        logger.debug(f"S3 Bucket '{bucket_name}' deleted successfully.")
+    except NoCredentialsError as e:
+        logger.error(f"Error deleting bucket: {e}")
+    except Exception as e:
+        logger.error(f"Error deleting bucket: {e}")
+
+
+
+
 
 class ModelManager:
-
-    def __init__(self,s3):
+    model = None
+    tokenizer = None
+    
+    def __init__(self,s3,bucket_name):
         self.s3 = s3
-        self.s3_bucket = "test-bucket"
+        self.s3_bucket = bucket_name
         self.model_name = "google/flan-t5-small"
+        self.zip_key = "model_data.zip"
         self.model_key = "model_weights"
         self.tokenizer_key = "model_tokenizer_weights"
-        self.model_local_path = "/tmp/model"
-        self.tokenizer_local_path = "/tmp/tokenizer"
-        self.model = None
-        self.tokenizer = None
-        self.is_initialized = False
-        self._temp_s3_model_path = f"/tmp/model"
-        self._temp_s3_tokenizer_path =  f"/tmp/tokenizer"
+
+        self.local_path = "/tmp/model/"
+        self.model_local_path = f"{self.local_path}model"
+        self.tokenizer_local_path = f"{self.local_path}tokenizer"
+
+        self.max_new_tokens = 1000
+        if ModelManager.model and ModelManager.tokenizer:
+            self.is_initialized = True
+        else:
+            self.is_initialized = False
+        self.max_length_input = 10000
+
+        self._temp_root = "/tmp"
+        self._temp_root_dir = f"{self._temp_root}/model"
+        self._temp_s3_model_path = f"{self._temp_root_dir}/model"
+        self._temp_s3_tokenizer_path =  f"{self._temp_root_dir}/tokenizer"
+        self.format = "zip"
+        self.compress_name = "model"
 
         self.warm_up_key = "warm_up_status.json"
         self.completed_status_indicator = "completed"
         self.ongoing_status_indicator = "ongoing"
         self.fail_status_indicator = "failure"
+        self.clean_status_indicator= "clean"
+        
 
     def initialize_model(self):
-        self.s3.download_file(self.s3_bucket, self.model_key, self.model_local_path)
-        self.s3.download_file(self.s3_bucket, self.tokenizer_key, self.tokenizer_local_path)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_local_path)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_local_path)
-        self.is_initialized = True
+        logger.debug("func:initialize_model: Initialing Model")
+        if ModelManager.model:
+            logger.debug("func:initialize_model: model already iniitialized")
+            return
 
-    def retrieve_model(self):
-        if not self.is_initialized:
-            self.initialize_model()
-        return self.model, self.tokenizer
+        if ModelManager.tokenizer:
+            logger.debug("func:initialize_model: tokenizer already iniitialized")
+            return
+        try:
+            logger.debug("func:initialize_model: get model zip")
+            res = self.s3.get_object(Bucket=self.s3_bucket, Key=self.zip_key)
+            logger.debug("func:initialize_model: read model zip")
+            zip_data = res['Body'].read()
+            zip_buffer = io.BytesIO(zip_data)
+            logger.debug("func:initialize_model: extract model zip")
+            with zipfile.ZipFile(zip_buffer,'r') as zip_ref:
+                zip_ref.extractall(self.local_path)
+            logger.debug("func:initialize_model: iniitializing model and tokenizer class instances")
+            ModelManager.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_local_path)
+            ModelManager.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_local_path)
+            self.is_initialized = True
+        except Exception as e:
+            logger.error("error in initialing model: %s",e)
     
     def upload_model(self):
+        logger.debug("func:upload_model: uploading model to s3...")
         try:
             self.s3.put_object(Bucket=self.s3_bucket, Key=self.warm_up_key, Body=self.ongoing_status_indicator)
             model = AutoModelForSeq2SeqLM.from_pretrained(self.model_name)
             tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             model.save_pretrained(self._temp_s3_model_path)
             tokenizer.save_pretrained(self._temp_s3_tokenizer_path)
-            self.s3.upload_file(self._temp_s3_model_path, self.s3_bucket, self.model_key)
-            self.s3.upload_file(self._temp_s3_tokenizer_path, self.s3_bucket, self.tokenizer_key)
+            path = shutil.make_archive(self._temp_root + self.compress_name,self.format,root_dir=self._temp_root_dir)
+            self.s3.upload_file(Filename=path, Bucket=self.s3_bucket, Key=self.zip_key)
             self.s3.put_object(Bucket=self.s3_bucket, Key=self.warm_up_key, Body=self.completed_status_indicator)
-        except:
+            res = {
+                "status": self.completed_status_indicator
+            }
+            return res
+        except botocore.exceptions.ClientError as e:
+            print(f"Error in upload_model: {e}")
+            res = {
+                "err": str(e),
+            }
+            return res
+        except Exception as e:
+            print(f"Error in upload_model: {e}")
             self.s3.put_object(Bucket=self.s3_bucket, Key=self.warm_up_key, Body=self.fail_status_indicator)
-            return {"status": self.fail_status_indicator}   
-        return {"status": self.completed_status_indicator}
+            res = {
+                "status": self.fail_status_indicator,
+            }
+            return res
 
-s3 = boto3.client("s3")    
-model_manager = ModelManager(s3)
+    def _handle_input(self,text_inputs):
+        logger.debug("func:_handle_input:handle input")
+        model_input = '' 
+
+        if isinstance(text_inputs,list):
+            history_size = len(text_inputs)
+            if history_size > 1:
+                history_sizes = reversed(text_inputs)
+                acc = history_size
+                prompt_history = []
+                for s in history_sizes:
+                    if acc + len(s) > self.max_length_input:
+                        break
+                    acc += len(s)
+                    prompt_history.append(s)
+                model_input = " ".join(reversed(prompt_history))
+            else:
+                model_input = text_inputs[0]
+                if len(model_input) > self.max_length_input:
+                    model_input =  model_input[-self.max_length_input:]
+
+        if isinstance(text_inputs,str):
+            model_input = text_inputs
+            if len(model_input) > self.max_length_input:
+                model_input =  model_input[-self.max_length_input:]            
+
+        return model_input
+
+    def _prepare_model_input(self,text):
+        logger.debug("func:_prepare_model_input:Prepare Model Input")
+        return text
+
+    def predict_title(self,text_input:str):
+        logger.info("func:predict_title: Generating title for chat by first prompt...")
+        title_prompt_input = self._handle_input(text_input)
+        title_prompt = f'please give a title for the following prompt "{title_prompt_input}"'
+        model_input = self._prepare_model_input(title_prompt)
+        res = self._predict(model_input)
+        logger.debug(res)
+        if isinstance(res, list):
+            res = " ".join(res)
+        if res is None:
+            res = ''
+        return res
+
+    def _predict(self,text_inputs,max_new_tokens=None):
+        logger.debug("func:_predict: Predicting ...")
+        max_tokens = max_new_tokens if max_new_tokens else self.max_new_tokens
+        if not ModelManager.tokenizer:
+            logger.debug("func:_predict: No Tokenizer ...")
+        if not ModelManager.model:
+            logger.debug("func:_predict: No Model ...")
+        try:
+            inputs = ModelManager.tokenizer(text_inputs, return_tensors="pt")
+            outputs = ModelManager.model.generate(**inputs,max_new_tokens=max_tokens)
+            response = ModelManager.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            logger.debug("func:_predict: successful prediction")
+            return response
+        except Exception as e:
+            logger.debug("func:_predict: error in prediction input:")
+            logger.debug(inputs)
+            logger.error(f"func:_predict: error in predicting: {e}")
+    
+    def predict_prompt(self,text_inputs,max_new_tokens=None):
+        logger.debug("func:predict_prompt: Predicting Prompt...")
+        model_input = self._prepare_model_input(self._handle_input(text_inputs))
+        res = self._predict(model_input,max_new_tokens)
+        logger.debug("func:predict_prompt: result:")
+        logger.debug(res)
+        if isinstance(res, list):
+            res = " ".join(res)
+        if res is None:
+            res = ''
+        logger.debug("func:predict_prompt: result2:")
+        logger.debug(res)
+        return res
+
+class DBManager:
+    chats_table = None
+    chats_logs_table = None
+
+    def __init__(self,dynamodb) -> None:
+        self.dynamodb = dynamodb
+        self.chats_table_name = 'chats'
+        self.chats_logs_table_name = 'chats_logs'
+
+    def initilize_db(self):
+        DBManager.chats_table = self.get_table(self.chats_table_name)
+        DBManager.chats_logs_table = self.get_table(self.chats_logs_table_name)
+
+    def create_tables(self):
+        logger.info("creating tables")
+        self.create_table(
+            table_name=self.chats_table_name,
+            key_schema=[
+                {'AttributeName': 'chat_id', 'KeyType': 'HASH'},
+            ],
+            attribute_definitions=[
+                {'AttributeName': 'chat_id', 'AttributeType': 'S'},
+            ]
+        )
+        self.create_table(
+            table_name=self.chats_logs_table_name,
+            key_schema=[
+                {'AttributeName': 'prompt_id', 'KeyType': 'HASH'},
+            ],
+            attribute_definitions=[
+                {'AttributeName': 'prompt_id', 'AttributeType': 'S'},
+                {'AttributeName': 'chat_id', 'AttributeType': 'S'},
+            ],
+                GlobalSecondaryIndexes=[
+                    {
+                        'IndexName': 'chat_id_index',
+                        'KeySchema': [
+                            {'AttributeName': 'chat_id', 'KeyType': 'HASH'},
+                        ],
+                        'Projection': {
+                            'ProjectionType': 'ALL',
+                        },
+                        'ProvisionedThroughput': {
+                            'ReadCapacityUnits': 5, 
+                            'WriteCapacityUnits': 5,
+                        }
+                    }
+                ]            
+        )
+
+
+    def clean_tables(self):
+        self.clean_table(self.chats_table_name)
+        self.clean_table(self.chats_logs_table_name)
+
+    def delete_tables(self):
+        self.delete_table(self.chats_logs_table_name)
+        self.delete_table(self.chats_table_name)
+
+
+
+    def get_table(self,table_name):
+        
+        try:
+            table = self.dynamodb.Table(table_name)
+            logger.debug(f"table {table_name} exists")
+            return table
+        except:
+            logger.debug(f"table {table_name} was not created")
+
+    def clean_table(self,table_name):
+        try:
+            table = self.dynamodb.Table(table_name)
+            response = table.scan()
+            items = response.get('Items', [])
+
+            for item in items:
+                table.delete_item(
+                    Key={key['AttributeName']: item[key['AttributeName']] for key in table.key_schema}
+                )
+
+            logger.info(f"All records deleted from table '{table_name}'.")
+        except ClientError as e:
+            logger.error(f"Error cleaning table '{table_name}': {e.response['Error']['Message']}")
+
+    def create_table(self,table_name, key_schema, attribute_definitions,GlobalSecondaryIndexes=None):
+        try:
+            table_params = {
+                'TableName': table_name,
+                'KeySchema': key_schema,
+                'AttributeDefinitions': attribute_definitions,
+                'ProvisionedThroughput': {
+                    'ReadCapacityUnits': 5,
+                    'WriteCapacityUnits': 5
+                }
+            }
+
+            if GlobalSecondaryIndexes is not None:
+                table_params['GlobalSecondaryIndexes'] = GlobalSecondaryIndexes
+
+            table = self.dynamodb.create_table(**table_params)
+            table.wait_until_exists()
+            logger.info(f"Table '{table_name}' created successfully.")
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ResourceInUseException':
+                logger.info(f"Table '{table_name}' already exists.")
+            else:
+                logger.error(f"Error creating table '{table_name}': {e.response['Error']['Message']}")
+
+    def delete_table(self,table_name):
+        try:
+            table = self.dynamodb.Table(table_name)
+            table.delete()
+            logger.info(f"Table '{table_name}' deleted successfully.")
+        except NoCredentialsError as e:
+            logger.error(f"Error deleting table: {e}")
+        except Exception as e:
+            logger.error(f"Error deleting table: {e}")
+
+
+
+
+    def generate_chat_id(self):
+        return str(uuid.uuid4())
+
+    def get_current_date(self):
+        d = datetime.now()
+        date = str(d)
+        return date
+
+
+
+    def add_new_chat(self, title):
+        logger.debug("adding new chat")
+        chat_id = self.generate_chat_id()
+        date = self.get_current_date()
+        try:
+            res = DBManager.chats_table.put_item(Item={
+                'chat_id': chat_id,
+                'date': date,
+                'title': title
+            })
+            logger.debug("Chat table -Item added successfully!")
+            logger.debug(res)
+            return chat_id
+        except Exception as e:
+            logger.error(f"Error adding item: {e}")        
+
+    def get_chat_chat_logs(self,chat_id):
+        try:
+            response = DBManager.chats_logs_table.query(
+                IndexName='chat_id_index',
+                KeyConditionExpression=Key('chat_id').eq(chat_id)
+            )
+            logs = sorted(response['Items'],key=lambda x: x['date'])
+            for d in logs:
+                d.pop('chat_id', None)            
+            logger.debug(f"got all logs successfuly")   
+            return logs
+        except Exception as e:
+            logger.error(f"Error getting chat log: {e}")   
+
+    def add_new_chat_log(self,chat_id, prompt,response):
+        logger.debug("func:add_new_chat_log: adding new chat log")
+        prompt_id = self.generate_chat_id()
+        date = self.get_current_date()
+        try:
+            res = DBManager.chats_logs_table.put_item(Item={
+                'prompt_id': prompt_id,
+                'chat_id': chat_id,
+                'date':date,
+                'prompt': prompt,
+                'response': response
+                
+            })
+            logger.debug("table chats logs item added successfully!")
+            logger.debug(res)
+            new_log =  {
+                "prompt_id":prompt_id,
+                "date":date,
+                "prompt":prompt,
+                "response":response
+            }
+            return new_log    
+        except Exception as e:
+            logger.error(f"Error adding item: {e}")        
+            return False
+
+    def get_all_chats_with_logs(self):
+        response = DBManager.chats_table.scan()
+        chats = response.get('Items', [])
+        chats.sort(key=lambda x: x['date'])
+        chat_ids = [item['chat_id'] for item in chats]
+        all_chats_with_logs = [self.get_chat_with_logs(chat_id) for chat_id in chat_ids]
+        return all_chats_with_logs
+
+    def get_chat_with_logs(self,chat_id):
+        logger.debug(f"get chat data with chad id: {chat_id}")
+        res = DBManager.chats_table.get_item(Key={'chat_id': chat_id})
+        if 'Item' not in res:
+            return None        
+        chat_data = res['Item']
+        title = chat_data['title']
+        date = chat_data['date']
+        logs = self.get_chat_chat_logs(chat_id)
+        chat_details = {
+            'chat_id': chat_id,
+            'title': title,
+            'date': date,
+            'logs': logs
+        }
+        return chat_details
+
+
+
+
 STAGE = os.getenv("STAGE", "dev")
 NAMESPACE = os.getenv("POWERTOOLS_METRICS_NAMESPACE", "ServerlessConversation")
+CONF = get_aws_config()
+
 app = APIGatewayRestResolver()
 tracer = Tracer()
-logger = Logger(serialize_stacktrace=True)
+logger = Logger(serialize_stacktrace=True,level=logging.DEBUG)
 metrics = Metrics(namespace="ServerlessConversation")
-# metrics.set_default_dimensions(environment=STAGE, another="one")
 
+s3 = boto3.client("s3",**CONF)    
+dynamodb = boto3.resource('dynamodb',**CONF)
+
+bucket_name = "test-bucket"
+model_manager = ModelManager(s3,bucket_name)
+db_manager = DBManager(dynamodb)
+
+
+
+
+# Lambdas 
 
 
 # Warm Up Lambda
+@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
+@tracer.capture_lambda_handler
+@metrics.log_metrics(capture_cold_start_metric=True)
 def warm_up_handler(event, context):
-    return model_manager.upload_model()
-    s3 = boto3.client("s3")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    temp_model_path = f"/tmp/model"
-    temp_tokenizer_path = f"/tmp/tokenizer"
-    model.save_pretrained(temp_model_path)
-    tokenizer.save_pretrained(temp_tokenizer_path)
-    s3.upload_file(temp_model_path, s3_bucket, model_key)
-    s3.upload_file(temp_tokenizer_path, s3_bucket, tokenizer_key)
-    s3.put_object(Bucket=s3_bucket, Key=warm_up_key, Body=completed_status_indicator)
+    db_manager.create_tables()
+    create_bucket(bucket_name)
+    response =  model_manager.upload_model()
+    res = {
+        'statusCode': 200,
+        'body': json.dumps(response)
+    }
+    return res  
+  
 
-    return {"status": completed_status_indicator}
-
-
-
-# Converse Lambda
-
-def get_warm_up_status():
-    # s3 = boto3.client("s3")
-    ongoing_status_indicator = "ongoing"
-    status = ongoing_status_indicator    
-    try:
-        response = s3.get_object(Bucket=s3_bucket, Key=warm_up_key)
-        status = response["Body"].read().decode("utf-8")
-    except s3.exceptions.NoSuchKey:
-        status = ongoing_status_indicator
-    return status
-
-def predict(model,tokenizer,text_input,max_new_tokens=1000):
-    inputs = tokenizer(text_input, return_tensors="pt")
-    outputs = model.generate(**inputs,max_new_tokens=max_new_tokens)
-    response = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-    return response
+# Warm Down Lambda
+@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
+@tracer.capture_lambda_handler
+@metrics.log_metrics(capture_cold_start_metric=True)
+def cool_down_handler(event, context):
+    clean_bucket(bucket_name)
+    delete_bucket(bucket_name)
+    db_manager.clean_tables()
+    db_manager.delete_tables()
+    return {
+        'statusCode': 200,
+    }
 
 
-@app.get(rule="/bad-request-error")
-@tracer.capture_method
-def bad_request_error():
-    raise BadRequestError("Missing required parameter")  # HTTP  400
-
-@app.get(rule="/not-found-error")
-@tracer.capture_method
-def not_found_error():
-    raise NotFoundError  # HTTP 404
-
-
-@app.get(rule="/internal-server-error")
-@tracer.capture_method
-def internal_server_error():
-    raise InternalServerError("Internal server error")  # HTTP 500
-
-
-@app.not_found
-@tracer.capture_method
-def handle_not_found_errors(exc: NotFoundError) -> Response:
-    logger.info(f"Not found route: {app.current_event.path}")
-    return Response(status_code=418, content_type=content_types.TEXT_PLAIN, body="I'm a teapot!")
-
-
-@app.exception_handler(ValueError)
-def handle_invalid_limit_qs(ex: ValueError):  # receives exception raised
-    metadata = {"path": app.current_event.path, "query_strings": app.current_event.query_string_parameters}
-    logger.error(f"Malformed request: {ex}", extra=metadata)
-
-    return Response(
-        status_code=400,
-        content_type=content_types.TEXT_PLAIN,
-        body="Invalid request parameters.",
-    )
 
 @app.get("/hello")
 @tracer.capture_method
@@ -184,47 +559,126 @@ def hello() -> Response:
 def chats() -> Response:
     metrics.add_metric(name="ChatsInvocations", unit=MetricUnit.Count, value=1)
     logger.info("Get All Chats API - HTTP 200")
-    input_text = "A step by step recipe to make bolognese pasta:"
-    model, tokenizer = model_manager.retrieve_model()
-    output = predict(model,tokenizer,input_text)
-    return {"message": "all chatss","output": f"{output}"}
+    chats_data = db_manager.get_all_chats_with_logs()
+    return {"data": chats_data}
 
 @app.post("/c")
 @tracer.capture_method
 def new_chat() -> Response:
     metrics.add_metric(name="NewChatInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("New Chat API - HTTP 200")
-    return {"message": "new_chat"}
+    logger.info("Inside Method Post New Chat API")
+    data = app.current_event.body
+    json_data = json.loads(data)
+    prompt = json_data["prompt"]
+    if not prompt:
+        return {
+            "statusCode":400,
+            "message":"prompt is missing"
+        }        
+    title = model_manager.predict_title(prompt)
+    logger.info(title)
+    chat_id = db_manager.add_new_chat(title)
+    if chat_id:
+        model_response = model_manager.predict_prompt(prompt)
+        if model_response:
+            res = db_manager.add_new_chat_log(chat_id,prompt,model_response)
+            if res:
+                chat_data = db_manager.get_chat_with_logs(chat_id)
+                if chat_data:
+                    return {
+                        "statusCode":200,
+                        "data":chat_data
+                    }    
+    return {
+        "statusCode":500,
+        "message":"Interval Error"
+    }    
 
 @app.get("/c/<chat_id>")
 @tracer.capture_method
 def chat(chat_id: str) -> Response:
     metrics.add_metric(name="ChatInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("Get Chat API - HTTP 200")
-    return {"message": "get_chat"}
-
+    logger.info("Inside Method Get Chat API")
+    chat_data = db_manager.get_chat_with_logs(chat_id)
+    if chat_data:
+        return {
+            "statusCode":200,
+            "data":chat_data
+        }
+    else:
+        return {
+            "statusCode":404,
+            "message":"Doesnt not exists"
+        } 
+    
 @app.put("/c/<chat_id>")
 @tracer.capture_method
 def converse(chat_id: str) -> Response:
     metrics.add_metric(name="ConverseInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("Converse API - HTTP 200")
-    return {"message": "converse"}
+    logger.info("Inside Method Converse API")
+
+    chat_data = db_manager.get_chat_with_logs(chat_id)
+    if not chat_data:
+        return {
+            "statusCode":404,
+            "message":"Doesnt not exists"
+        }
+    data = app.current_event.json_body
+    prompt = data['prompt']
+    if not prompt:
+        return {
+            "statusCode":400,
+            "message":"prompt is missing"
+        }        
+    if not isinstance(prompt,str):
+        return {
+            "statusCode":400,
+            "message":"prompt must be a string"
+        }                
+    history = [c['prompt'] for c in chat_data['logs']]
+    history.append(prompt)
+    model_response = model_manager.predict_prompt(history)
+    if model_response:
+        new_log = db_manager.add_new_chat_log(chat_id,prompt,model_response)
+        if new_log:
+            return {
+                "statusCode":200,
+                "data": new_log
+            }  
+    return {
+        "statusCode":500,
+        "message":"Interval Error"
+    }  
 
 
 
+def get_warm_up_status():
+    logger.debug("func:get_warm_up_status: get status")
+    ongoing_status_indicator = "ongoing"
+    status = ongoing_status_indicator    
+    bucket = model_manager.s3_bucket
+    warm_up_key = model_manager.warm_up_key
+    try:
+        response = s3.get_object(Bucket=bucket, Key=warm_up_key)
+        status = response["Body"].read().decode("utf-8")
+    except s3.exceptions.NoSuchKey:
+        status = ongoing_status_indicator
+    return status
 
-# Enrich logging with contextual information from Lambda
+
+
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-# Adding tracer
-# See: https://awslabs.github.io/aws-lambda-powertools-python/latest/core/tracer/
 @tracer.capture_lambda_handler
-# ensures metrics are flushed upon request completion/failure and capturing ColdStart metric
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:    
     status = get_warm_up_status()
-    completed_status_indicator = "completed"
-    logger.info("Model Upload Status: ", status)
-    # if status != completed_status_indicator:
-    #     logger.info("Stopping Lambda")
-    #     return {"status": status}
+    if status != model_manager.completed_status_indicator:
+        logger.debug("func:lambda_handler: status not completed... returning...")
+        res = {
+            'statusCode': 202,
+            "message": "The request has been accepted for processing, but the processing has not been completed"
+        }
+        return res
+    db_manager.initilize_db()
+    model_manager.initialize_model()
     return app.resolve(event, context)

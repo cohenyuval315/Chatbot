@@ -6,7 +6,7 @@ Description: >
 Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
   Function:
     Timeout: 600
-    MemorySize: 256
+    MemorySize: 2048
     Runtime: python3.9
     Environment:
       Variables:
@@ -63,7 +63,7 @@ Resources:
     Properties:
       Handler: lambda_function.warm_up_handler 
       CodeUri: converse 
-      Description: initilize the model to s3
+      Description: initialize the application
       Architectures:
       - x86_64
       Tracing: Active
@@ -71,11 +71,31 @@ Resources:
         YourEvent:
           Type: Api
           Properties:
-            Path: /
+            Path: /start
             Method: GET 
       Tags:
         LambdaPowertools: python
 
+      
+  CoolDownFunction:
+    Type: AWS::Serverless::Function   
+    Properties:
+      Handler: lambda_function.cool_down_handler 
+      CodeUri: converse 
+      Description: clean-up function
+      Architectures:
+      - x86_64
+      Tracing: Active
+      Events:
+        YourEvent:
+          Type: Api
+          Properties:
+            Path: /stop
+            Method: GET 
+      Tags:
+        LambdaPowertools: python
+
+      
 
 
   ApplicationResourceGroup:
@@ -104,4 +124,6 @@ Outputs:
     Description: load model chatbot Lambda Function ARN
     Value: !GetAtt WarmUpFunction.Arn
 
-
+  CoolDownFunction:
+    Description: load model chatbot Lambda Function ARN
+    Value: !GetAtt CoolDownFunction.Arn
