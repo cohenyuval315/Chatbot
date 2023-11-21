@@ -88,12 +88,15 @@ nav {
   width: 100%;
   max-width: 340px;
 }
-.navPromptWrapper {
-  border-bottom: 1px solid #ffffff33;
-  padding: 10px;
-  height: calc(100vh - 330px);
-  overflow-y: auto;
+
+
+/* .navPromptWrapper::-webkit-scrollbar {
+  width: auto;
 }
+.navPromptWrapper::-webkit-scrollbar-track, .navPromptWrapper::-webkit-scrollbar-thumb {
+  background: transparent;
+} */
+
 .navPrompt {
   display: flex;
   align-items: center;
@@ -214,10 +217,31 @@ nav svg {
 }
 
 /* adding custom scrollbar */
+
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
   background-color: #575969;
 }
+.navPromptWrapper:hover {
+  visibility: visible;
+  overflow-y: auto; 
+  
+}
+
+.navPromptWrapper {
+  border-bottom: 1px solid #ffffff33;
+  padding: 10px;
+  flex:1;
+  height: calc(100vh - 330px);
+  overflow-y: hidden;
+  
+}
+
+.navPromptWrapper:hover ::-webkit-scrollbar {
+  background-color: #333;  
+}
+
+
 ::-webkit-scrollbar-thumb {
   background-clip: content-box;
   border-color: transparent;
@@ -289,7 +313,7 @@ nav svg {
   line-height: 24px;
 }
 
-.openaiSVG {
+.botSVG {
   transform: scale(0.5);
 }
 #avatar {
@@ -436,12 +460,12 @@ form button {
   .userSVG {
     transform: scale(0.5);
   }
-  .openaiSVG {
+  .botSVG {
     transform: scale(0.4);
   }
   #avatar {
-    width: 30px;
-    height: 30px;
+    /* width: 30px;
+    height: 30px; */
   }
   #introsection {
     padding: 20px 20px 40px 20px;
@@ -594,4 +618,39 @@ form button {
   width: 1ch;
   animation: flicker 0.5s infinite;
   margin-bottom: 4px;
+}
+
+
+
+
+/* Loading Page  */
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #282c34;
+  justify-content: center;
+  height: 100vh;
+}
+
+.loading-spinner {
+  border: 8px solid #000;
+  border-top: 8px solid #3498db;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+h1 {
+  margin-top: 20px;
+  font-family: 'Arial', sans-serif;
+  font-size: 24px;
+  color: #3498db;
 }

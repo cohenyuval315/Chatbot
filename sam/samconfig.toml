@@ -4,7 +4,7 @@ version = 0.1
 
 [default]
 [default.global.parameters]
-stack_name = "chatbot"
+stack_name = "chatbot-app"
 
 [default.build.parameters]
 cached = true
@@ -17,9 +17,10 @@ lint = true
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
-s3_prefix = "chatbot"
+s3_prefix = "chatbot-app"
 region = "eu-west-3"
 image_repositories = []
+stack_name = "chatbot-app"
 
 [default.package.parameters]
 resolve_s3 = true

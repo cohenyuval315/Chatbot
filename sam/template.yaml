@@ -2,58 +2,107 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   chatbot
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: chatbot
+    Description: description
+    Author: Yuval Cohen
+    SpdxLicenseId: Apache-2.0
+    LicenseUrl: LICENSE.txt
+    ReadmeUrl: README.md
+    Labels: ['tests']
+    HomePageUrl: https://github.com/cohenyuval315/Chatbot
+    SemanticVersion: 0.0.1
+    SourceCodeUrl: https://github.com/cohenyuval315/Chatbot
+
+
+
+
 
 Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
+  Api:
+    Name: MyApi
+    Cors:
+      AllowMethods: "'OPTIONS, PUT, POST, GET, DELETE'"
+      AllowHeaders: "'*'"
+      AllowOrigin: "'*'"
+      MaxAge: "'600'"
+
   Function:
+    # Architectures:
+    # - x86_64
     Timeout: 600
     MemorySize: 2048
     Runtime: python3.9
     Environment:
       Variables:
         LOG_LEVEL: INFO
-        STAGE: dev #Production    
+        STAGE: Dev #Production    
         POWERTOOLS_SERVICE_NAME: conversation # Powertools for AWS Lambda (Python) env vars: https://awslabs.github.io/aws-lambda-powertools-python/#environment-variables
         POWERTOOLS_METRICS_NAMESPACE: ServerlessConversation
         POWERTOOLS_DEV: 'true'
         POWERTOOLS_DEBUG: 'true'
         POWERTOOLS_LOGGER_LOG_EVENT : 'true'
-        
+
 Resources:
+
+  MyServerlessRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Dev
+
   ConverseFunction:
-    Type: AWS::Serverless::Function     # More info about Function Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html
+    Type: AWS::Serverless::Function   
     Properties:
       Handler: lambda_function.lambda_handler
-      CodeUri: converse
+      CodeUri: functions
       Description: conversation with chatbot
       Architectures:
       - x86_64
       Tracing: Active
-      Events: # More info about API Event Source: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-property-function-api.html
+      Events: 
         HelloPath:
           Type: Api           
           Properties:
             Path: /hello
             Method: GET
+            
         ChatsPath:
           Type: Api           
           Properties:
             Path: /c
             Method: GET                  
+            
         NewChatPath:
           Type: Api           
           Properties:
             Path: /c
             Method: POST
+            
         ChatPath:
           Type: Api           
           Properties:
             Path: /c/{chat_id}
-            Method: GET                 
+            Method: GET                
+            
         ConversePath:
           Type: Api           
           Properties:
             Path: /c/{chat_id}
             Method: PUT
+            
+        DeleteChatPath:
+          Type: Api           
+          Properties:
+            Path: /c/{chat_id}
+            Method: DELETE 
+
+        CorsOptions:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: OPTIONS                       
+
 
       Tags:
         LambdaPowertools: python
@@ -61,8 +110,8 @@ Resources:
   WarmUpFunction:
     Type: AWS::Serverless::Function   
     Properties:
-      Handler: lambda_function.warm_up_handler 
-      CodeUri: converse 
+      Handler: warm_up_lambda.lambda_handler 
+      CodeUri: functions 
       Description: initialize the application
       Architectures:
       - x86_64
@@ -75,13 +124,12 @@ Resources:
             Method: GET 
       Tags:
         LambdaPowertools: python
-
-      
+  
   CoolDownFunction:
     Type: AWS::Serverless::Function   
     Properties:
-      Handler: lambda_function.cool_down_handler 
-      CodeUri: converse 
+      Handler: cool_down_lambda.lambda_handler 
+      CodeUri: functions 
       Description: clean-up function
       Architectures:
       - x86_64
@@ -111,11 +159,8 @@ Resources:
       ResourceGroupName:
         Ref: ApplicationResourceGroup
       AutoConfigurationEnabled: 'true'
-Outputs:
-  HelloWorldApi:
-    Description: API Gateway endpoint URL for Prod environment
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
 
+Outputs:
   ConverseFunction:
     Description: conversation with chatbot Lambda Function ARN
     Value: !GetAtt ConverseFunction.Arn

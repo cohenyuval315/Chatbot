@@ -1,0 +1,1 @@
+samlocal local start-api --warm-containers eager --debug -p 3001
