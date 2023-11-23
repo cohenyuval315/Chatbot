@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from converse import lambda_function
+from functions import lambda_function
 
 def lambda_context():
     class LambdaContext:

@@ -1,54 +1,35 @@
 import React, { useEffect, useRef } from "react";
-import ChatBoxInput from "./ChatBoxInput";
+import ChatBoxInput from "./ChatInput/ChatInput";
 import IntroSection from "./IntroSection";
-import ChatPrompt from "./ChatPrompt";
-import {useChat} from '../../context/ChatContext'
+import {useChat} from '../../contexts/ChatContext'
 import NewChat from "./NewChat";
-import BotMessage from "./BotMessage";
+import ChatLog from "./ChatLog";
+import ChatHeader from "./ChatHeader/ChatHeader";
 
-const ChatBox = (props) => {
-    const {selectedChat,showIntro} = useChat();
-    const chatLogRef = useRef(null);
-
-    useEffect(() => {
-        if (chatLogRef.current) {
-          chatLogRef.current.scrollIntoView({
-            behavior: "smooth",
-            block: "end",
-          });
-        }
-        return () => {};
-      }, []);
-
+const ChatBox = () => {
+    const {selectedChat,deleteSelectedChat} = useChat();
+    
     return (
         <section className="chatBox">
-            {selectedChat.title}
-            {selectedChat.log.length > 0 ? (
-                <div className="chatLogWrapper">
-                    {selectedChat.log.length > 0 &&
-                    selectedChat.log.map((chat, idx) => {
-                        return (
-                        <div
-                        className="chatLog"
-                        key={`msg_${idx}`}
-                        ref={chatLogRef}
-                        >
-                            <ChatPrompt text={chat.prompt} />
-                            <BotMessage chatLogRef={chatLogRef} response={chat.response} animate={selectedChat.log.length - 1 === idx} />
-
-                        </div>
-                        
-                    )})}
-                </div>
-            ) : (
-                <>
-                {showIntro?<IntroSection/>:<NewChat/>}
-                </>
+            {selectedChat && (
+            <>
+                {selectedChat.chat_id === null ? (<>
+                    <ChatHeader title={"New Chat"}/>
+                    <NewChat/>
+                </>) : (<>
+                    {selectedChat.chat_id === -1 ? (<>
+                        <ChatHeader title={"Introduction"}/>
+                        <IntroSection/>
+                    </>) : (<>
+                        <ChatHeader title={selectedChat.title} onDelete={()=>deleteSelectedChat(selectedChat.chat_id)}/>
+                        <ChatLog/>
+                    </>)}
+                </>)}
+            </>
             )}
             <ChatBoxInput />
         </section>
-    );
-
+    )
 
 
 

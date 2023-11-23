@@ -1,10 +1,18 @@
 import React from 'react';
 import './App.css';
-import AppLayout from './pages/AppLayout';
+import {ChatProvider} from "./contexts/ChatContext";
+import ChatApplication from './pages/ChatApplication';
 
 function App() {
+  
   return (
-    <AppLayout/>
+    <div className="">
+      {/* <header className="App-header">
+      </header> */}
+      <ChatProvider>
+        <ChatApplication/>
+      </ChatProvider>
+    </div>
   );
 }
 
