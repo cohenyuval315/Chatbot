@@ -15,7 +15,7 @@ class APIClient {
       const requestOptions = {
         method: method,
         headers: {
-          // mode: 'no-cors',
+          mode: 'no-cors',
           'Content-Type': 'application/json',
         },
       };
@@ -44,6 +44,13 @@ class APIClient {
       }
     }
 
+    async fetchModelOptions(){
+      const endpoint = "/m"
+      const method = "GET"
+      const data = await this._request(method,endpoint)
+      return data;
+    }
+
     async fetchChats() {
       const endpoint = "/c"
       const method = "GET"
@@ -51,30 +58,32 @@ class APIClient {
       return data;
     }
 
-    async converse(chat,prompt){
+    async converse(chat,prompt,model_name){
       const chat_id = chat.id
       if (!chat_id){
-        return await this.createNewChat(prompt)
+        return await this.createNewChat(prompt,model_name)
       }else{
-        return await this.updateChat(chat_id,prompt)
+        return await this.updateChat(chat_id,prompt,model_name)
       }
     }
 
-    async createNewChat(prompt){
+    async createNewChat(prompt,model_name){
       const endpoint = "/c"
       const method = "POST"
       const body = {
-        "prompt":prompt
+        "prompt":prompt,
+        "model_name":model_name
       }
       const data = await this._request(method,endpoint,body)
       return data;
     }
 
-    async updateChat(chat_id,prompt){
+    async updateChat(chat_id,prompt,model_name){
       const endpoint = `/c/${chat_id}`
       const method = "PUT"
       const body = {
-        "prompt":prompt
+        "prompt":prompt,
+        "model_name":model_name
       }
       const data = await this._request(method,endpoint,body);
       return data;

@@ -9,7 +9,6 @@ const NavChatList = () => {
     
 
     useEffect(() => {
-        console.log("CHATS:",chats,currentChats)
         if(!chats){
             setCurrentChats(null);
             return
@@ -26,11 +25,9 @@ const NavChatList = () => {
 
         const isNewChat = currentChats.length !== chats.length;    
         if (isNewChat) {
-            console.log('New chat detected!');
             const newChats = chats.map((chat) => ({ ...chat, new: !currentChats.find((c) => c.id === chat.id) }));
             setCurrentChats(newChats);
         }
-        console.log("CHATS:",chats,currentChats)
       }, [chats,currentChats]);
 
 
