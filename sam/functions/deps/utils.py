@@ -1,15 +1,15 @@
 from botocore.exceptions import NoCredentialsError
 from .logger import logger
-from .globals import s3
-from .config import BUCKET_NAME,WARM_UP_KEY
+from .globals import s3,WARM_UP_KEY,MODEL_OPTIONS,MODEL_AVAILABLE_OPTIONS
+from .execption import ModelNotFoundError
 
 
-def get_warm_up_status():
+def get_warm_up_status(bucket_name):
     logger.debug("func:get_warm_up_status: get status")
     ongoing_status_indicator = "ongoing"
     status = ongoing_status_indicator    
     try:
-        response = s3.get_object(Bucket=BUCKET_NAME, Key=WARM_UP_KEY)
+        response = s3.get_object(Bucket=bucket_name, Key=WARM_UP_KEY)
         status = response["Body"].read().decode("utf-8")
     except s3.exceptions.NoSuchBucket:
         status = ongoing_status_indicator
@@ -58,5 +58,16 @@ def delete_bucket(bucket_name):
     except Exception as e:
         logger.error(f"Error deleting bucket: {e}")
 
+def get_model(model_name):
+    for option in MODEL_OPTIONS:
+        if option['model'] == model_name:
+            return option
+    raise ModelNotFoundError    
+    
 
+def get_available_models():
+    models = []
+    for model_option_index in MODEL_AVAILABLE_OPTIONS:
+        models.append(MODEL_OPTIONS[model_option_index])
+    return models
 
