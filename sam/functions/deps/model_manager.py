@@ -10,38 +10,39 @@ class ModelManager:
     model = None
     tokenizer = None
     
-    def __init__(self,s3,bucket_name,model_name,warm_up_key):
+    def __init__(self,s3,bucket_name,model_name,model_key,warm_up_key,max_length_input=10000,max_new_tokens=1000):
         self.s3 = s3
         self.s3_bucket = bucket_name
         self.model_name = model_name
-        self.zip_key = "model_data.zip"
-        self.model_key = "model_weights"
-        self.tokenizer_key = "model_tokenizer_weights"
+        self.model_key = model_key
+        self.zip_key = f"{self.model_key}_data.zip"
+        self.model_key = f"{self.model_key}_weights"
+        self.tokenizer_key = f"{self.model_key}_tokenizer_weights"
 
-        self.local_path = "/tmp/model/"
-        self.model_local_path = f"{self.local_path}model"
+        self.local_path = f"/tmp/{self.model_key}/"
+        self.model_local_path = f"{self.local_path}{self.model_key}"
         self.tokenizer_local_path = f"{self.local_path}tokenizer"
 
-        self.max_new_tokens = 1000
+        self.max_new_tokens = max_new_tokens
         if ModelManager.model and ModelManager.tokenizer:
             self.is_initialized = True
         else:
             self.is_initialized = False
-        self.max_length_input = 10000
+        self.max_length_input = max_length_input
 
         self._temp_root = "/tmp"
         self._temp_root_dir = f"{self._temp_root}/model"
-        self._temp_s3_model_path = f"{self._temp_root_dir}/model"
+        self._temp_s3_model_path = f"{self._temp_root_dir}/{self.model_key}"
         self._temp_s3_tokenizer_path =  f"{self._temp_root_dir}/tokenizer"
         self.format = "zip"
-        self.compress_name = "model"
+        self.compress_name = f"{self.model_key}"
 
         self.warm_up_key = warm_up_key
         self.completed_status_indicator = "completed"
         self.ongoing_status_indicator = "ongoing"
         self.fail_status_indicator = "failure"
         self.clean_status_indicator= "clean"
-        
+
 
     def initialize_model(self):
         logger.info("func:initialize_model: Initialing Model")
@@ -68,6 +69,7 @@ class ModelManager:
         except Exception as e:
             logger.error("error in initialing model: %s",e)
     
+
     def upload_model(self):
         logger.info("func:upload_model: uploading model to s3...")
         try:

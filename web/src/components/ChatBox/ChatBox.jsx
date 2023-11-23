@@ -7,21 +7,21 @@ import ChatLog from "./ChatLog";
 import ChatHeader from "./ChatHeader/ChatHeader";
 
 const ChatBox = () => {
-    const {selectedChat,deleteSelectedChat} = useChat();
+    const {selectedChat,deleteSelectedChat,selectedModelOption,modelOptions,onModelSelect,dropdownLabelProperty,dropdownValueProperty} = useChat();
     
     return (
         <section className="chatBox">
             {selectedChat && (
             <>
                 {selectedChat.chat_id === null ? (<>
-                    <ChatHeader title={"New Chat"}/>
+                    <ChatHeader title={"New Chat"} initialOption={selectedModelOption} modelOptions={modelOptions} onModelSelect={onModelSelect} dropdownLabelProperty={dropdownLabelProperty}  dropdownValueProperty={dropdownValueProperty}/>
                     <NewChat/>
                 </>) : (<>
                     {selectedChat.chat_id === -1 ? (<>
-                        <ChatHeader title={"Introduction"}/>
+                        <ChatHeader title={"Introduction"} initialOption={selectedModelOption} modelOptions={modelOptions} onModelSelect={onModelSelect} dropdownLabelProperty={dropdownLabelProperty}  dropdownValueProperty={dropdownValueProperty}/>
                         <IntroSection/>
                     </>) : (<>
-                        <ChatHeader title={selectedChat.title} onDelete={()=>deleteSelectedChat(selectedChat.chat_id)}/>
+                        <ChatHeader title={selectedChat.title} initialOption={selectedModelOption} onDelete={()=>deleteSelectedChat(selectedChat.chat_id)} modelOptions={modelOptions} onModelSelect={onModelSelect} dropdownLabelProperty={dropdownLabelProperty}  dropdownValueProperty={dropdownValueProperty}/>
                         <ChatLog/>
                     </>)}
                 </>)}

@@ -35,13 +35,28 @@ export function ChatProvider({ children }) {
   const [selectedChatError, setSelectedChatError] = useState(false);
   const [error, setError] = useState(false);
 
-  const printInterval = 50;
+  const [modelOptions,setModelOptions] = useState(null);
+  const [selectedModelOption,setSelectedModelOption] = useState(null);
 
-  useEffect(()=>{
-    fetchChats().then((data)=>{
-      setLoading(false);
-    })
+  const printInterval = 50;
+  const dropdownLabelProperty = "model_name";
+  const dropdownValueProperty = "model_key";
+
+
+  const fetchModelOptions = useCallback(async () => {
+    try {
+      const data = await client.fetchModelOptions();
+      const modelsData = data['data']
+      const dropdownOptions = modelsData;
+      setModelOptions(dropdownOptions);
+      setSelectedModelOption(dropdownOptions[0]);  
+      setError(false);
+      return data;
+    } catch (error){
+      setError(error);
+    }
   },[])
+
 
   const fetchChats = useCallback(async () => {
     try {
@@ -56,9 +71,32 @@ export function ChatProvider({ children }) {
     }
   },[])
 
+
+  useEffect(()=>{
+    const fetchData = async () => {
+      try {
+        await Promise.all([fetchModelOptions(), fetchChats()]);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
+    
+
+  }, [fetchModelOptions, fetchChats]);
+
+
+
+  const onModelSelect = (modelOption) => {
+    setSelectedModelOption(modelOption);
+  }
+
+
   const createNewChat = async (prompt) => {
     try {
-      const data = await client.createNewChat(prompt);
+      const data = await client.createNewChat(prompt,selectedModelOption['model_name']);
       setError(false);
       return data;
     } catch (error){
@@ -89,7 +127,7 @@ export function ChatProvider({ children }) {
   }
 
   const onMessageNewChat = async (prompt) => {
-    const item = await createNewChat(prompt);
+    const item = await createNewChat(prompt,selectedModelOption['model_name']);
     const data = item['data'];
     if (item){
       const selected = await onChatSelect(data);
@@ -110,11 +148,11 @@ export function ChatProvider({ children }) {
   }
 
   const onChatConverse = async (prompt) => {
-    setTempItem(null);
     if (selectedChat && selectedChat.chat_id !== null && selectedChat !== -1){
-      const updateRes = await client.updateChat(selectedChat.chat_id,prompt);
+      await client.updateChat(selectedChat.chat_id,prompt,selectedModelOption['model_name']);
       const res = await client.getChat(selectedChat.chat_id);
       const chat = res['data']
+      setTempItem(null);
       setSelectedChat(chat);
     }
 
@@ -130,9 +168,9 @@ export function ChatProvider({ children }) {
     }
   }
 
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  // function sleep(ms) {
+  //   return new Promise(resolve => setTimeout(resolve, ms));
+  // }
 
   const handleInputSubmit = async (prompt) => {
     let res = null;
@@ -140,13 +178,14 @@ export function ChatProvider({ children }) {
       console.log("handleInputSubmit:Should Not Be Here...")
       return
     }
-    setTempItem({
+    const temp = {
       "prompt_id":null,
       "prompt":prompt
-    });
+    }
+    setTempItem(temp);
     if(selectedChat.chat_id === null || selectedChat.chat_id === -1){ // Create New Chat
       res = await onMessageNewChat(prompt);
-      setTempItem(null);
+     
     }else{
       res =  await onChatConverse(prompt);
     }
@@ -155,10 +194,13 @@ export function ChatProvider({ children }) {
 
 
 
-
+  
 
   return (
     <ChatContext.Provider value={{ 
+      dropdownLabelProperty,
+      dropdownValueProperty,
+      selectedModelOption,
       printInterval,
       chats,
       selectedChat, 
@@ -167,6 +209,8 @@ export function ChatProvider({ children }) {
       selectedChatError,
       selectedChatLoading, 
       tempItem,
+      modelOptions,
+      onModelSelect,
       onChatSelect, 
       onNewChatSelect,
       onChatConverse,

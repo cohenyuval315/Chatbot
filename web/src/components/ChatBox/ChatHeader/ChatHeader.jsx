@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import Dropdown from "../../General/Dropdown";
 
-const ChatHeader = ({title,onDelete}) => {
+const ChatHeader = ({title,onDelete,initialOption,modelOptions,onModelSelect,dropdownLabelProperty,dropdownValueProperty}) => {
   const [showModal, setShowModal] = useState(false);
   const handleDeleteClick = (e) => {
     e.preventDefault();
@@ -19,10 +20,19 @@ const ChatHeader = ({title,onDelete}) => {
   const handleOverlayClick = () => {
     setShowModal(false);
   };
+  
 
     return (
         <>
     <div style={headerStyle}>
+      <div>
+        <div>
+          Model:
+        </div>
+        <div>
+        <Dropdown initialOption={initialOption} options={modelOptions} onSelect={onModelSelect} labelProperty={dropdownLabelProperty} valueProperty={dropdownValueProperty}/>
+        </div>
+      </div>
       <div style={titleContainerStyle}>
         <div style={titleStyle}>{title}</div>
       </div>

@@ -97,6 +97,12 @@ Resources:
             Path: /c/{chat_id}
             Method: DELETE 
 
+        ModelsPath:
+          Type: Api
+          Properties:
+            Path: /m
+            Method: GET                       
+
         CorsOptions:
           Type: Api
           Properties:
