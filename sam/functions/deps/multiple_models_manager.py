@@ -119,7 +119,7 @@ class LLM:
     def predict(self,text_inputs,max_new_tokens=None,skip_special_token=True):
         inputs = self.tokenize(text_inputs)
         output = self.generate(inputs,max_new_tokens)
-        predict_result = self.clean_batch_decode(output,skip_special_token=skip_special_token)
+        predict_result = self.clean_batch_decode(output)
         results = self.handle_results(predict_result)
         return results
            

@@ -149,7 +149,7 @@ class Chats(DynamoTable):
             return True
 
     def get_chat(self,chat_id:str):
-        res = self.chats_table.get_item(Key={'chat_id': chat_id})
+        res = self.table.get_item(Key={'chat_id': chat_id})
         if 'Item' not in res:
             return None        
         chat_data = res['Item']
@@ -266,7 +266,7 @@ class DynamoDB(SingletonBase):
 
 
     def add_new_chat(self, title:str):
-        self.chats.create_chat(title)
+        return self.chats.create_chat(title)
 
     def get_chat_chat_logs(self,chat_id:str):
         return self.chats_logs.get_chat_logs(chat_id)

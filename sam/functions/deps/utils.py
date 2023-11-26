@@ -23,8 +23,8 @@ def make_lambda_response(statusCode:int,body:dict=None,headers:dict=None):
 def make_lambda_message_response(statusCode:int,message:str,headers:dict=None):
     return make_lambda_response(statusCode,{"message": message},headers)
 
-def make_lambda_error_response(statusCode:int,error_message:str,headers:dict=None):
-    return make_lambda_response(statusCode,{"error": error_message},headers)
+def make_lambda_error_response(statusCode:int,error_message:str=None,headers:dict=None):
+    return make_lambda_response(statusCode,{"error": error_message} if error_message else None,headers)
 
 def make_lambda_data_response(data:str,headers:dict=None):
     return make_lambda_response(200,{"data": data},headers)

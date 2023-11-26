@@ -69,6 +69,7 @@ def new_chat() -> Response:
                 chat_data = db_manager.get_chat_with_logs(chat_id)
                 if chat_data:
                     return make_lambda_data_response(chat_data)
+                
     return make_lambda_error_response(500)
 
 @app.delete("/c/<chat_id>",cors=CORS)

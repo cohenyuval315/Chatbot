@@ -15,22 +15,28 @@ class APIClient {
       const contentLength = response.headers.get('Content-Length');
       if (contentLength && parseInt(contentLength, 10) > 0) {
           const body = await response.json();
-          const data = body['body'];
-          if (response.ok) {
+          if ('body' in body){
+            const data = body['body'];
+            if (response.ok) {
             
-            if ('data' in data) {
-              return data['data'];            
-            } else if ('message' in data) {
-              return data['message'];
-            } 
-
+              if ('data' in data) {  
+                return data['data'];            
+              } else if ('message' in data) {
+                return data['message'];
+              } 
+  
+            }else{
+              if ('error' in data) {
+                return data['error'];            
+              } else if ('message' in data) {
+                return data['message'];
+              } 
+            }            
           }else{
-            if ('error' in data) {
-              return data['error'];            
-            } else if ('message' in data) {
-              return data['message'];
-            } 
+            console.log("no body");
           }
+          
+
       } else{
         if (response.ok) {
           return true;

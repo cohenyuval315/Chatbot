@@ -15,17 +15,6 @@ def error_handler(handler, event, context) -> Callable:
         filename , lineno, funcname, text = traceback.extract_tb(se.__trackback__)[-1]
         logger.error(f"filename: {filename} \nfunction: {funcname} \nline number: {lineno}, \ntext: {text} \nerror:{str(se)}")
         return make_lambda_error_response(500,"Interval Server Error")
-    # except TypeError as te:
-    #     return make_lambda_error_response(400,f"Type Error")
-    # except KeyError as ke:
-    #     return make_lambda_error_response(400,f"Missing Key")
-    # except Exception as e:
-    #     pass
-    # except s3.exceptions.NoSuchBucket:
-    #     pass
-    # except s3.exceptions.NoSuchKey:
-    #     pass
-
 
 
 def bucket_creations():

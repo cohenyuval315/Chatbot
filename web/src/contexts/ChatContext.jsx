@@ -48,6 +48,7 @@ export function ChatProvider({ children }) {
     try {
       const data = await client.getModelsData();
       const modelsData = data
+      console.log(data)
       const dropdownOptions = modelsData;
       setModelOptions(dropdownOptions);
       setSelectedModelOption(dropdownOptions[0]);  
@@ -137,8 +138,10 @@ export function ChatProvider({ children }) {
 
   const onMessageNewChat = async (prompt) => {
     const item = await createNewChat(prompt,selectedModelOption['model_name']);
+    console.log(item)
     const data = item;
     if (item){
+      
       const selected = await onChatSelect(data);
       if (selected){
         const items = await fetchChats();
@@ -169,12 +172,8 @@ export function ChatProvider({ children }) {
 
   const deleteSelectedChat = async (chat_id) => {
     const res = await client.deleteChat(chat_id);
-    if (res['statusCode'] === 200){
-      setSelectedChat(newChat)
-      await fetchChats()
-    }else{
-
-    }
+    setSelectedChat(newChat)
+    await fetchChats()
   }
 
   // function sleep(ms) {

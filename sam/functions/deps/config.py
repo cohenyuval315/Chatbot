@@ -24,8 +24,8 @@ class LLMConfiguration:
     # 
     max_length:int = 20
     min_length:int = 0 
-    min_new_tokens:Optional[int] 
-    max_time:Optional[float]
+    min_new_tokens:Optional[int] = None 
+    max_time:Optional[float] = None
     early_stopping:Optional[str] = False 
  
 
@@ -40,7 +40,7 @@ class LLMConfiguration:
         if self.model_link:
             res['model_link'] = self.model_link
         if self.model_link:
-            res['tasks'] = self.tasks            
+            res['tasks'] = [t.value for t in self.tasks]  
         return res
     
 
@@ -55,10 +55,10 @@ class LLMConfiguration:
         if self.model_link:
             res['model_link'] = self.model_link
         if self.model_link:
-            res['tasks'] = self.tasks            
+            res['tasks'] = [t.value for t in self.tasks]            
         return res
     
-    
+
 
 def get_aws_config():
     if os.getenv("STAGE") == "Prod":
@@ -96,9 +96,6 @@ if DELETE_DYNAMO_DATA is False:
     DELETE_DYNAMO_TABLES = False
 
 
-tasks: Optional[list[TaskType]] = None
-trainable:bool = False
- 
 
 flan_t5_small = LLMConfiguration(
     model_name="google/flan-t5-small",
