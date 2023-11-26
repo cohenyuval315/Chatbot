@@ -701,3 +701,44 @@ h1 {
 .dropdown-options li:hover {
   background-color: #04053a;
 }
+
+
+
+.model-cards-container {
+  overflow-x: auto;
+  white-space: nowrap;
+  width:1000px;
+  height: 90px;
+  padding: 10px;
+  border: 1px solid #272727;
+  border-radius: 10px;
+}
+
+.model-cards-list {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  
+}
+
+.model-card-item {
+  margin-right: 16px;
+  list-style: none;
+}
+
+.model-card {
+  border: 1px solid #ddd;
+  padding: 10px;
+  flex:1;
+  
+}
+
+/* Optional: Hide scrollbar for a cleaner look */
+.model-cards-container::-webkit-scrollbar {
+  display: none;
+}
+
+
+

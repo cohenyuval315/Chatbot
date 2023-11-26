@@ -13,5 +13,7 @@ tracer = Tracer()
 metrics = Metrics(namespace="ServerlessConversation")
 s3 = boto3.client("s3",**CONFIG)    
 dynamodb = boto3.resource('dynamodb',**CONFIG)
+iam = boto3.client('iam',**CONFIG)
+
 db_manager = DynamoDB(dynamodb)
-cors = True
+

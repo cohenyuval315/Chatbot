@@ -37,7 +37,7 @@ Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/devel
     Environment:
       Variables:
         LOG_LEVEL: INFO
-        STAGE: Dev #Production    
+        STAGE: Dev #Prod    
         POWERTOOLS_SERVICE_NAME: conversation # Powertools for AWS Lambda (Python) env vars: https://awslabs.github.io/aws-lambda-powertools-python/#environment-variables
         POWERTOOLS_METRICS_NAMESPACE: ServerlessConversation
         POWERTOOLS_DEV: 'true'
@@ -54,6 +54,7 @@ Resources:
   ConverseFunction:
     Type: AWS::Serverless::Function   
     Properties:
+      Timeout: 6000
       Handler: lambda_function.lambda_handler
       CodeUri: functions
       Description: conversation with chatbot
@@ -114,8 +115,11 @@ Resources:
         LambdaPowertools: python
 
   WarmUpFunction:
+
     Type: AWS::Serverless::Function   
     Properties:
+      Timeout: 6000
+      MemorySize: 4096
       Handler: warm_up_lambda.lambda_handler 
       CodeUri: functions 
       Description: initialize the application

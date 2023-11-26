@@ -5,10 +5,10 @@ import { useChat } from "../contexts/ChatContext";
 import LoadingPage from "./LoadingPage";
 
 const ChatApplication = () => {
-  const {loading} = useChat();
+  const {loading,chatsLoading} = useChat();
   return (
     <>
-      {!loading ? (      
+      {!loading && !chatsLoading ? (      
          <div className="App">        
             <header className="App-header">
             </header>

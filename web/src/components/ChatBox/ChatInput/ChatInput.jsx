@@ -2,13 +2,18 @@ import React, { useRef, useState } from "react";
 import { useChat } from "../../../contexts/ChatContext";
 
 const ChatInput = () => {
-    const {handleInputSubmit} = useChat();
+    const {handleInputSubmit,selectedModelOption} = useChat();
     const [inputPrompt, setInputPrompt] = useState("");
     const inputRef = useRef(null); 
     const [disabled,setDisabled] = useState(false);
 
     const onInputSubmit = async (e) => {
         e.preventDefault();
+        if (!selectedModelOption){
+            setInputPrompt("")    
+            return;
+        }
+        
         setInputPrompt("");
         if (inputRef.current) {
             inputRef.current.blur();

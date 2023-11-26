@@ -5,10 +5,10 @@ from datetime import datetime
 from .logger import logger
 from .singleton_base import SingletonBase
 
-def generate_chat_id():
+def generate_chat_id() -> str:
     return str(uuid.uuid4())
 
-def get_current_date():
+def get_current_date() -> str:
     d = datetime.now()
     date = str(d)
     return date
@@ -39,6 +39,8 @@ class DynamoTable(SingletonBase):
         }
         if self._global_secondary_key in self.table_configuration.keys():
             self.table_params[f"{self._global_secondary_key}"] = table_configuration[f"{self._global_secondary_key}"]
+
+        self.table = self.get_table()
 
     def _validate_configuration(self,table_configuration:dict):
         keys = table_configuration.keys()
@@ -71,59 +73,41 @@ class DynamoTable(SingletonBase):
                         raise ValueError(f"invalid item type in {self._global_secondary_key} . should be a json . type:  {type(item)}")
 
     def create_table(self):
-        logger.info(f"creating table '{self.table_name}'.")
         try:
             table = self.dynamodb.create_table(**self.table_params)
-            table.wait_until_exists()
-            logger.info(f"Table '{self.table_name}' created successfully.")
+            table.wait_until_exists()        
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceInUseException':
-                logger.info(f"Table '{self.table_name}' already exists.")
+                pass
             else:
-                logger.error(f"Error creating table '{self.table_name}': {e.response['Error']['Message']}")
-            return False
+                raise e
 
-    def get_table(self,create_if_not_exists=False):
-        logger.info(f"get {self.table_name} table")
+    def get_table(self,create_if_not_exists:bool=True):
         try:
             table = self.dynamodb.Table(self.table_name)
-            logger.info(f"table {self.table_name} exists")
             return table
-        except:
-            logger.info(f"table {self.table_name} was not created")
-            if create_if_not_exists:
-                create_res = self.create_table()
-                if create_res is False:
-                    raise Exception("Shouldnt Get Here")                
-                return self.create_table(False)
-            return False
-
-    def clean_table(self):
-        logger.info(f"cleaning table '{self.table_name}'.")
-        try:
-            table = self.dynamodb.Table(self.table_name)
-            response = table.scan()
-            items = response.get('Items', [])
-
-            for item in items:
-                table.delete_item(
-                    Key={key['AttributeName']: item[key['AttributeName']] for key in table.key_schema}
-                )
-
-            logger.info(f"All records deleted from table '{self.table_name}'.")
         except ClientError as e:
-            logger.error(f"Error cleaning table '{self.table_name}': {e.response['Error']['Message']}")
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                if create_if_not_exists:
+                    self.create_table()
+                    return self.get_table(False)
+            raise e from e
+            
+    def clean_table(self):
+        table = self.dynamodb.Table(self.table_name)
+        response = table.scan()
+        items = response.get('Items', [])
+
+        for item in items:
+            table.delete_item(
+                Key={key['AttributeName']: item[key['AttributeName']] for key in table.key_schema}
+            )
 
     def delete_table(self):
-        logger.info(f"delete table '{self.table_name}'.")
-        try:
-            table = self.dynamodb.Table(self.table_name)
-            table.delete()
-            logger.info(f"Table '{self.table_name}' deleted successfully.")
-        except NoCredentialsError as e:
-            logger.error(f"Error deleting table: {e}")
-        except Exception as e:
-            logger.error(f"Error deleting table: {e}")
+        table = self.dynamodb.Table(self.table_name)
+        table.delete()
+        logger.info(f"Table '{self.table_name}' deleted successfully.")
+
 
 class Chats(DynamoTable):
     def __init__(self, dynamodb_instance) -> None:
@@ -137,6 +121,48 @@ class Chats(DynamoTable):
             ]
         }
         super().__init__(dynamodb_instance, name, table_configuration)
+        
+    def get_all_chats(self):
+        response = self.table.scan()
+        chats = response.get('Items', [])
+        chats.sort(key=lambda x: x['date'])
+        return chats
+
+    def create_chat(self, title:str):
+        chat_id = generate_chat_id()
+        date = get_current_date()        
+        self.table.put_item(Item={
+            'chat_id': chat_id,
+            'date': date,
+            'title': title
+        })
+        return chat_id
+
+    def delete_chat(self,chat_id:str):
+        response = self.table.delete_item(
+            Key={
+                'chat_id': chat_id
+            }
+        )
+        status_code = response['ResponseMetadata']['HTTPStatusCode']
+        if status_code == 200:
+            return True
+
+    def get_chat(self,chat_id:str):
+        res = self.chats_table.get_item(Key={'chat_id': chat_id})
+        if 'Item' not in res:
+            return None        
+        chat_data = res['Item']
+        title = chat_data['title']
+        date = chat_data['date']
+        chat_details = {
+            'chat_id': chat_id,
+            'title': title,
+            'date': date,
+        }
+        return chat_details
+
+
 
 class ChatsLogs(DynamoTable):
     def __init__(self, dynamodb_instance) -> None:
@@ -168,6 +194,53 @@ class ChatsLogs(DynamoTable):
         }
         super().__init__(dynamodb_instance, name, table_configuration)
 
+    def create_chat_log(self,chat_id:str, prompt:str,response:str):
+        prompt_id = generate_chat_id()
+        date = get_current_date()
+        self.table.put_item(Item={
+            'prompt_id': prompt_id,
+            'chat_id': chat_id,
+            'date':date,
+            'prompt': prompt,
+            'response': response,
+        })
+
+        new_log =  {
+            "prompt_id":prompt_id,
+            "date":date,
+            "prompt":prompt,
+            "response":response
+        }
+        return new_log      
+    
+    def get_chat_logs(self,chat_id:str):
+        response = self.table.query(
+            IndexName='chat_id_index',
+            KeyConditionExpression=Key('chat_id').eq(chat_id)
+        )
+        logs = sorted(response['Items'],key=lambda x: x['date'])
+        for d in logs:
+            d.pop('chat_id', None)            
+        return logs
+    
+    def delete_chat_logs(self,chat_id:str):
+        response = self.table.scan(
+            FilterExpression='chat_id = :val',
+            ExpressionAttributeValues={
+                ':val': {'S': chat_id}
+            }
+        )
+        for item in response.get('Items', []):
+            self.table.delete_item(
+                Key={
+                    'prompt_id': item['prompt_id']
+                }
+            )
+            status_code = response['ResponseMetadata']['HTTPStatusCode']
+            if status_code != 200:
+                return None
+        return True
+
 
 class DynamoDB(SingletonBase):
     def __init__(self,dynamodb_instance):
@@ -192,129 +265,46 @@ class DynamoDB(SingletonBase):
         self.chats.delete_table()
 
 
+    def add_new_chat(self, title:str):
+        self.chats.create_chat(title)
 
-    def add_new_chat(self, title):
-        logger.info("dbmanager: add_new_chat")
-        chat_id = generate_chat_id()
-        date = get_current_date()
-        try:
-            res = self.chats_table.put_item(Item={
-                'chat_id': chat_id,
-                'date': date,
-                'title': title
-            })
-            logger.info("Chat table -Item added successfully!")
-            logger.debug(res)
-            return chat_id
-        except Exception as e:
-            logger.error(f"Error adding item: {e}")        
+    def get_chat_chat_logs(self,chat_id:str):
+        return self.chats_logs.get_chat_logs(chat_id)
 
-    def get_chat_chat_logs(self,chat_id):
-        logger.info("dbmanager: get_chat_chat_logs")
-        try:
-            response = self.chats_logs_table.query(
-                IndexName='chat_id_index',
-                KeyConditionExpression=Key('chat_id').eq(chat_id)
-            )
-            logs = sorted(response['Items'],key=lambda x: x['date'])
-            for d in logs:
-                d.pop('chat_id', None)            
-            logger.info(f"got all chat logs successfuly")   
-            return logs
-        except Exception as e:
-            logger.error(f"Error getting chat log: {e}")   
-
-    def add_new_chat_log(self,chat_id, prompt,response):
-        logger.info("func:add_new_chat_log: adding new chat log")
-        prompt_id = generate_chat_id()
-        date = get_current_date()
-        try:
-            res = self.chats_logs_table.put_item(Item={
-                'prompt_id': prompt_id,
-                'chat_id': chat_id,
-                'date':date,
-                'prompt': prompt,
-                'response': response
-                
-            })
-            logger.info("table chats logs item added successfully!")
-            logger.debug(res)
-            new_log =  {
-                "prompt_id":prompt_id,
-                "date":date,
-                "prompt":prompt,
-                "response":response
-            }
-            return new_log    
-        except Exception as e:
-            logger.error(f"Error adding item: {e}")        
-            return False
+    def add_new_chat_log(self,chat_id:str, prompt:str,response:str):
+        return self.chats_logs.create_chat_log(chat_id,prompt,response)
 
     def get_all_chats(self):
-        logger.info("dbmanager:func:get_all_chats")
-        response = self.chats_table.scan()
-        chats = response.get('Items', [])
-        chats.sort(key=lambda x: x['date'])
-        return chats
+        return self.chats.get_all_chats()
 
     def get_all_chats_with_logs(self):
-        logger.info("dbmanager:func:get_all_chats_with_logs")
-        response = self.chats_table.scan()
-        chats = response.get('Items', [])
-        chats.sort(key=lambda x: x['date'])
+        chats = self.chats.get_all_chats()
         chat_ids = [item['chat_id'] for item in chats]
         all_chats_with_logs = [self.get_chat_with_logs(chat_id) for chat_id in chat_ids]
         return all_chats_with_logs
 
-    def get_chat_with_logs(self,chat_id):
-        logger.info(f"dbmanager:func:get_chat_with_logs")
-        res = self.chats_table.get_item(Key={'chat_id': chat_id})
-        if 'Item' not in res:
-            return None        
-        chat_data = res['Item']
-        title = chat_data['title']
-        date = chat_data['date']
-        logs = self.get_chat_chat_logs(chat_id)
-        if not logs:
-            logs = []
-        chat_details = {
-            'chat_id': chat_id,
-            'title': title,
-            'date': date,
-            'logs': logs
-        }
-        return chat_details
+    def get_chat_with_logs(self,chat_id:str):
+        self.chats_logs.get_chat_logs(chat_id)
+        chat = self.chats.get_chat(chat_id)
+        if chat:
+            logs = self.get_chat_chat_logs(chat_id)
+            chat_details = {
+                'chat_id': chat_id,
+                'title': chat['title'],
+                'date': chat['date'],
+                'logs':logs if logs else []
+            }            
+            return chat_details
+        
+        
 
-    def delete_chat(self,chat_id):
-        logger.info("dbmanager:func:delete_chat")
-        deletes_res = self.delete_chat_logs(chat_id)
-        if deletes_res:
-            response = self.chats_table.delete_item(
-                Key={
-                    'chat_id': chat_id
-                }
-            )
-            status_code = response['ResponseMetadata']['HTTPStatusCode']
-            if status_code == 200:
+    def delete_chat(self,chat_id:str):
+        logs_deleted = self.chats_logs.delete_chat_logs(chat_id)
+        if logs_deleted:
+            chat_deleted = self.chats.delete_chat(chat_id)
+            if chat_deleted:
                 return True
         
-    def delete_chat_logs(self,chat_id):
-        logger.info("dbmanager:func:delete_chat_logs")
-        response = self.chats_logs_table.scan(
-            FilterExpression='chat_id = :val',
-            ExpressionAttributeValues={
-                ':val': {'S': chat_id}
-            }
-        )
-        for item in response.get('Items', []):
-            response_delete = self.chats_logs_table.delete_item(
-                Key={
-                    'prompt_id': item['prompt_id']
-                }
-            )
-            status_code = response['ResponseMetadata']['HTTPStatusCode']
-            if status_code != 200:
-                return None
-        return True
-
+    def delete_chat_logs(self,chat_id:str):
+        return self.chats_logs.delete_chat_logs(chat_id)
 

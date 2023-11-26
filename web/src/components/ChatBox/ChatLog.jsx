@@ -10,14 +10,14 @@ const [currentChatLogs,setCurrentChatLogs] = useState(null);
 const chatLogRef = useRef(null);
 
 useEffect(()=>{
-  console.log("TEMP:",tempItem)
+  // console.log("TEMP:",tempItem)
     if (currentSelectedChat === null || currentSelectedChat.chat_id !== selectedChat.chat_id){
         setCurrentSelectedChat(selectedChat);
         const logs = selectedChat.logs.map((c)=>{
           c.new = false
           return c;
         })
-        console.log(logs);
+        // console.log(logs);
         setCurrentChatLogs(logs);
         return;
     }

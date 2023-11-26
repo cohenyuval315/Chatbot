@@ -11,17 +11,12 @@ def lambda_handler(event, context):
         delete_bucket(BUCKET_NAME)
     else:
         for b_name in get_models_buckets_names():
-                clean_bucket(b_name)
-                delete_bucket(b_name)
+            clean_bucket(b_name)
+            delete_bucket(b_name)
     if DELETE_DYNAMO_DATA:
         db_manager.clean_tables()
     if DELETE_DYNAMO_TABLES:
         db_manager.delete_tables()
-    res = {
-        'statusCode': 200,
-        'body': json.dumps({
-            "message":"clean up success!"
-        })
-    }
-    return res  
+        
+    return make_lambda_message_response(200,"clean up success!")
 

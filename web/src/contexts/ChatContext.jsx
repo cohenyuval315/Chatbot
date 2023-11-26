@@ -30,6 +30,7 @@ export function ChatProvider({ children }) {
   const [selectedChat, setSelectedChat] = useState(introChat);
   const [tempItem,setTempItem] = useState(null);
   
+  const [chatsLoading, setChatsLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [selectedChatLoading, setSelectedChatLoading] = useState(false);
   const [selectedChatError, setSelectedChatError] = useState(false);
@@ -45,8 +46,8 @@ export function ChatProvider({ children }) {
 
   const fetchModelOptions = useCallback(async () => {
     try {
-      const data = await client.fetchModelOptions();
-      const modelsData = data['data']
+      const data = await client.getModelsData();
+      const modelsData = data
       const dropdownOptions = modelsData;
       setModelOptions(dropdownOptions);
       setSelectedModelOption(dropdownOptions[0]);  
@@ -60,8 +61,7 @@ export function ChatProvider({ children }) {
 
   const fetchChats = useCallback(async () => {
     try {
-      const chatsData = await client.fetchChats()
-      const data = chatsData['data']
+      const data = await client.getChats()
       setChats(data);
       setError(false);
       return data;
@@ -73,13 +73,22 @@ export function ChatProvider({ children }) {
 
 
   useEffect(()=>{
+        
     const fetchData = async () => {
-      try {
-        await Promise.all([fetchModelOptions(), fetchChats()]);
+      await fetchModelOptions().then((data)=>{
         setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
+      })      
+      await fetchChats().then((data)=>{
+        setChatsLoading(false);
+      })
+
+      
+      // try {
+      //   await Promise.all([fetchModelOptions(), fetchChats()]);
+      //   setLoading(false);
+      // } catch (error) {
+      //   console.error('Error fetching data:', error);
+      // }
     };
 
     fetchData();
@@ -109,7 +118,7 @@ export function ChatProvider({ children }) {
       setSelectedChatLoading(true);
       const chat_id = item.chat_id;
       const chatData = await client.getChat(chat_id);
-      const data = chatData['data']
+      const data = chatData;
       setSelectedChat(data);
       setSelectedChatLoading(false);
       setSelectedChatError(false);
@@ -128,7 +137,7 @@ export function ChatProvider({ children }) {
 
   const onMessageNewChat = async (prompt) => {
     const item = await createNewChat(prompt,selectedModelOption['model_name']);
-    const data = item['data'];
+    const data = item;
     if (item){
       const selected = await onChatSelect(data);
       if (selected){
@@ -151,7 +160,7 @@ export function ChatProvider({ children }) {
     if (selectedChat && selectedChat.chat_id !== null && selectedChat !== -1){
       await client.updateChat(selectedChat.chat_id,prompt,selectedModelOption['model_name']);
       const res = await client.getChat(selectedChat.chat_id);
-      const chat = res['data']
+      const chat = res;
       setTempItem(null);
       setSelectedChat(chat);
     }
@@ -205,6 +214,7 @@ export function ChatProvider({ children }) {
       chats,
       selectedChat, 
       loading,
+      chatsLoading,
       error,
       selectedChatError,
       selectedChatLoading, 

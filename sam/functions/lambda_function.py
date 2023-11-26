@@ -17,7 +17,7 @@ from typing import Callable
 import time
 from deps import *
 
-@app.get("/hello",cors=cors)
+@app.get("/hello",cors=CORS)
 @tracer.capture_method
 def hello() -> Response:
     # adding custom metrics
@@ -25,45 +25,34 @@ def hello() -> Response:
     metrics.add_metric(name="HelloWorldInvocations", unit=MetricUnit.Count, value=1)
     # structured log
     # See: https://awslabs.github.io/aws-lambda-powertools-python/latest/core/logger/
-    logger.info("Hello world API ")
-    return {"message": "hello world"}
+    return make_lambda_message_response(200,"hello world")
 
 
-@app.get("/c",cors=cors)
+@app.get("/c",cors=CORS)
 @tracer.capture_method
 def chats() -> Response:
     metrics.add_metric(name="ChatsInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("Get All Chats API")
     chats_data = db_manager.get_all_chats()
-    return {
-        "statusCode":200,
-        "data": chats_data}
+    return make_lambda_data_response(chats_data)
 
-@app.get("/cl",cors=cors)
+@app.get("/cl",cors=CORS)
 @tracer.capture_method
 def chats_with_logs() -> Response:
     metrics.add_metric(name="ChatsInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("Get All Chats with Logs API ")
     chats_data = db_manager.get_all_chats_with_logs()
-    return {"data": chats_data}
+    return make_lambda_data_response(200,chats_data)
 
-@app.post("/c",cors=cors)
+
+
+@app.post("/c",cors=CORS)
 @tracer.capture_method
 def new_chat() -> Response:
     metrics.add_metric(name="NewChatInvocations", unit=MetricUnit.Count, value=1)
-    # logger.info("Inside Method Post New Chat API")
     data = app.current_event.body
     json_data = json.loads(data)
-    prompt = json_data["prompt"]
-    if not prompt:
-        return {
-            "statusCode":400,
-            "message":"prompt is missing"
-        }        
+    prompt = json_data["prompt"]        
     llm = ModelsManager.get_model()
-    logger.debug(llm)
     title = llm.predict_title(prompt)
-    logger.info(title)
     chat_id = db_manager.add_new_chat(title)
     if chat_id:
         # chat_data = db_manager.get_chat_with_logs(chat_id)
@@ -79,186 +68,125 @@ def new_chat() -> Response:
             if res:
                 chat_data = db_manager.get_chat_with_logs(chat_id)
                 if chat_data:
-                    return {
-                        "statusCode":200,
-                        "data":chat_data
-                    }    
-    return {
-        "statusCode":500,
-        "message":"Interval Error"
-    }    
+                    return make_lambda_data_response(chat_data)
+    return make_lambda_error_response(500)
 
-@app.delete("/c/<chat_id>",cors=cors)
+@app.delete("/c/<chat_id>",cors=CORS)
 @tracer.capture_method
 def delete_chat(chat_id:str) -> Response:
     metrics.add_metric(name="DeleteChatsInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("Delete Chat API")
     res = db_manager.delete_chat(chat_id)
     if res:
-        return {
-            "statusCode":200
-        }
-    return {
-        "statusCode":500,
-        "message":"IntervalServerError"
-    }
+        return make_lambda_response(200)
+    logger.error(f"failed to delete chat: error {res}")
+    return make_lambda_error_response(500)
 
-@app.get("/c/<chat_id>",cors=cors)
+@app.get("/c/<chat_id>",cors=CORS)
 @tracer.capture_method
 def chat(chat_id: str) -> Response:
     metrics.add_metric(name="ChatInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("Inside Method Get Chat API")
     chat_data = db_manager.get_chat_with_logs(chat_id)
     if chat_data:
-        return {
-            "statusCode":200,
-            "data":chat_data
-        }
-    else:
-        return {
-            "statusCode":404,
-            "message":"Doesnt not exists"
-        } 
+        return make_lambda_data_response(chat_data)    
+    return make_lambda_message_response(404,"Chat Does Not Exists")
+
     
-@app.put("/c/<chat_id>",cors=cors)
+@app.put("/c/<chat_id>",cors=CORS)
 @tracer.capture_method
 def converse(chat_id: str) -> Response:
     metrics.add_metric(name="ConverseInvocations", unit=MetricUnit.Count, value=1)
-    logger.info("Inside Method Converse API")
-
     chat_data = db_manager.get_chat_with_logs(chat_id)
     if not chat_data:
-        return {
-            "statusCode":404,
-            "message":"Doesnt not exists"
-        }
+        return make_lambda_message_response(404,"Chat Does Not Exists")
+
     data = app.current_event.json_body
     prompt = data['prompt']
-    if not prompt:
-        return {
-            "statusCode":400,
-            "message":"prompt is missing"
-        }        
-    if not isinstance(prompt,str):
-        return {
-            "statusCode":400,
-            "message":"prompt must be a string"
-        }                
     history = [c['prompt'] for c in chat_data['logs']]
     history.append(prompt)
     llm = ModelsManager.get_model()
     model_response = llm.predict_prompt(history)
+
     if model_response:
         new_log = db_manager.add_new_chat_log(chat_id,prompt,model_response)
         if new_log:
-            return {
-                "statusCode":200,
-                "data": new_log
-            }  
-    return {
-        "statusCode":500,
-        "message":"Interval Error"
-    }  
+            return make_lambda_data_response(new_log)
+    return make_lambda_error_response(500)
 
-@app.get("/m",cors=cors)
+
+
+@app.get("/m",cors=CORS)
 def get_models() -> Response:
-    available_options =[modelConf.to_json() for modelConf in  get_available_models()]
-    
-    return {
-        "statusCode":200,
-        "data": available_options
-    }
+    available_options =[modelConf.to_user_json() for modelConf in  MODEL_AVAILABLE_OPTIONS]
+    return make_lambda_data_response(available_options)
+
+
+
+def get_status_response(status):
+    if status == ONGOING_STATUS_INDICATOR: 
+        logger.info("func:lambda_handler: status not completed... returning...")
+        res = make_lambda_message_response(202,"The request has been accepted for processing, but the processing has not been completed")
+        return res
+    if status == FAIL_STATUS_INDICATOR:
+        logger.info("func:lambda_handler: status  bas failed... returning...")
+        res = make_lambda_error_response(500,"The request has been accepted for processing, but the processing has not been completed")
+        return res 
+
 
 
 @lambda_handler_decorator
-def lambda_middleware(handler, event, context) -> Callable:
-    start_time = time.time()
-    # logger.info("Lambda Middleware....")
+def preflight_middleware(handler, event, context) -> Callable:
     if event['httpMethod'] == 'OPTIONS':
-        # logger.info("responding to preflight request....")
-        response = {
-            "statusCode": 200,
-            "isBase64Encoded": 'false',
-            "headers": {
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-                "Access-Control-Allow-Origin": "*",
-            },
-            "body":json.dumps({"message":"preflight"})
-        }    
-        return response
-    
-    # ModelsManager.set_model(model_name="")
-    # logger.info("after preflight request....")
+        res = make_lambda_message_response(200,"preflight")
+        return res
+    return handler(event, context)
 
 
-    if event['httpMethod'] == 'POST' or event['httpMethod'] == 'PUT':
+@lambda_handler_decorator
+def model_middleware(handler, event, context) -> Callable:
+    if event['httpMethod'] == 'POST' or event['httpMethod'] == 'PUT': # methods that uses LLM model.
         data = json.loads(event['body'])
         model_name = data['model_name']
         model_conf = get_model(model_name)
         model_key = model_conf.model_key
         status = get_warm_up_status(model_key)
-        logger.debug(status)
-        completed_status_indicator = "completed"
-        ongoing_status_indicator = "ongoing"
-        fail_status_indicator = "failure"
-        if status != completed_status_indicator:
-            if status == ongoing_status_indicator: 
-                logger.info("func:lambda_handler: status not completed... returning...")
-                res = {
-                    'statusCode': 202,
-                    "body": json.dumps({"message":"The request has been accepted for processing, but the processing has not been completed"})
-                }
-                return res
-            if status == fail_status_indicator:
-                logger.info("func:lambda_handler: status  bas failed... returning...")
-                res = {
-                    'statusCode': 500,
-                }
-                return res  
+        if status != COMPLETED_STATUS_INDICATOR:
+            res = get_status_response(status)
+            return res 
+        
+        # model is available.
         ModelsManager.set_model(model_name)
 
+    return handler(event, context)
+
+
+
+@lambda_handler_decorator
+def error_handler(handler, event, context) -> Callable:
     try:
-        warm_up_status_execution_time = str(time.time() - start_time)
-        start_time = time.time()
-        # model_manager.initialize_model()
-        init_model_execution_time = str(time.time() - start_time)
-        
-        execution_times = {
-            "middleware_execution_times": {
-                "warm_up_status":warm_up_status_execution_time,
-                "init_model":init_model_execution_time
-            }
-        }
-        exec_time_str = json.dumps(execution_times,indent=4)
-        # Logger.debug(exec_time_str)
+        response = handler(event, context)
+        return response
+    except ServerlessException as se:
+        filename , lineno, funcname, text = traceback.extract_tb(se.__trackback__)[-1]
+        logger.error(f"filename: {filename} \nfunction: {funcname} \nline number: {lineno}, \ntext: {text} \nerror:{str(se)}")
+        return make_lambda_error_response(500,"Interval Server Error")
+    # except ClientException as ve:
+    #     pass
+
+    except TypeError as te:
+        return make_lambda_error_response(400,f"Type Error")
+    except KeyError as ke:
+        return make_lambda_error_response(400,f"Missing Key")
     except Exception as e:
-        logger.debug(f"Error in measuring execution times: {str(e)}")
-        logger.error(f"Error in measuring execution times: {str(e)}")
+        filename , lineno, funcname, text = traceback.extract_tb(e.__trackback__)[-1]
+        logger.error(f"filename: {filename} \nfunction: {funcname} \nline number: {lineno}, \ntext: {text} \nerror:{str(se)}")
 
-    response = handler(event, context)
-    # logger.info(response)
-    body = response['body']
-    status = response['statusCode']
-    response = {
-        "statusCode":status,
-        "body":body,
-        "headers": {
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Allow-Origin": "*",
-        },        
-        "isBase64Encoded":'false',
-    }
-    response['body']
-    # logger.info(response)
-    return response
-
-
-
-@lambda_middleware
+@preflight_middleware
+@model_middleware
+@error_handler
 @logger.inject_lambda_context(log_event=True,correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:  
     return app.resolve(event, context) 
+
+
