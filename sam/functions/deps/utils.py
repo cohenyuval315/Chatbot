@@ -1,5 +1,8 @@
 from .globals import *
 from .execptions import *
+from .constants import *
+from .config import SystemConfig
+from .models import *
 
 def make_lambda_response(statusCode:int,body:dict=None,headers:dict=None):
     cors_headers = {
@@ -37,10 +40,10 @@ def get_warm_up_key(model_key):
 
 def get_warm_up_status(model_key):
     status = ONGOING_STATUS_INDICATOR    
-    if BUCKET_PER_MODEL:
+    if SystemConfig.BUCKET_PER_MODEL:
         bucket_name = get_model_bucket_name(get_model_by_key(model_key).model_name)
     else:
-        bucket_name = BUCKET_NAME
+        bucket_name = SystemConfig.BUCKET_NAME
     key = get_warm_up_key(model_key)
     response = s3.get_object(Bucket=bucket_name, Key=key)
     status = response["Body"].read().decode("utf-8")
@@ -80,20 +83,20 @@ def get_available_models():
     return MODEL_AVAILABLE_OPTIONS
 
 def get_model_bucket_name(model_name):
-    if BUCKET_PER_MODEL is False:
-        return BUCKET_NAME
-    return f"{BUCKET_NAME_PREFIX}-{model_name}"
+    if SystemConfig.BUCKET_PER_MODEL is False:
+        return SystemConfig.BUCKET_NAME
+    return f"{SystemConfig.BUCKET_NAME_PREFIX}-{model_name}"
 
 def get_models_buckets_names():
-    if BUCKET_PER_MODEL is False:
-        return BUCKET_NAME
+    if SystemConfig.BUCKET_PER_MODEL is False:
+        return SystemConfig.BUCKET_NAME
     names = []
     for conf in get_available_models():
         names.append(get_model_bucket_name(conf.model_name))
     return names
     
 def get_model_by_key(model_key):
-    for option in MODEL_OPTIONS:
+    for option in SystemConfig.MODEL_OPTIONS:
         if option.model_key == model_key:
             return option
   

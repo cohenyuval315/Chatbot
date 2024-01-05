@@ -11,10 +11,10 @@ const IntroSection = () => {
       <p>A serverless chatbot that allows you engage with various machine learning models, with some basic features which includes auto save conversations, and ability to delete conversations.</p>
       <u>
         <li>
-          <strong>GitHub Link:</strong> <a target="_blank"  style={{ color: 'gray' }}href="https://github.com/cohenyuval315/Chatbot">ChatBot GitHub Repository</a>
+          <strong>GitHub Link:</strong> <a rel="noreferrer" target="_blank"  style={{ color: 'gray' }}href="https://github.com/cohenyuval315/Chatbot">ChatBot GitHub Repository</a>
         </li>
         <li>
-        <strong>LinkedIn:</strong> <a target="_blank"  style={{ color: 'gray' }}href="https://www.linkedin.com/in/yc315/">Linkdin Profile</a>
+        <strong>LinkedIn:</strong> <a rel="noreferrer" target="_blank"  style={{ color: 'gray' }}href="https://www.linkedin.com/in/yc315/">Linkdin Profile</a>
         </li>
         <li>
           technology stack:
@@ -69,7 +69,7 @@ const ModelCard = ({ model_data }) => {
       </p>
       <p>
         <strong>Hugging Face Link:</strong>{' '}
-        <a target="_blank" style={{ color: 'gray' , cursor:"pointer"}} href={model_data.model_link} >
+        <a rel="noreferrer" target="_blank" style={{ color: 'gray' , cursor:"pointer"}} href={model_data.model_link} >
           Huggingface Model Link
         </a>
       </p>

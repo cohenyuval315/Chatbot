@@ -48,7 +48,6 @@ export function ChatProvider({ children }) {
     try {
       const data = await client.getModelsData();
       const modelsData = data
-      console.log(data)
       const dropdownOptions = modelsData;
       setModelOptions(dropdownOptions);
       setSelectedModelOption(dropdownOptions[0]);  
@@ -138,7 +137,6 @@ export function ChatProvider({ children }) {
 
   const onMessageNewChat = async (prompt) => {
     const item = await createNewChat(prompt,selectedModelOption['model_name']);
-    console.log(item)
     const data = item;
     if (item){
       
@@ -171,14 +169,10 @@ export function ChatProvider({ children }) {
   }
 
   const deleteSelectedChat = async (chat_id) => {
-    const res = await client.deleteChat(chat_id);
+    await client.deleteChat(chat_id);
     setSelectedChat(newChat)
     await fetchChats()
   }
-
-  // function sleep(ms) {
-  //   return new Promise(resolve => setTimeout(resolve, ms));
-  // }
 
   const handleInputSubmit = async (prompt) => {
     let res = null;

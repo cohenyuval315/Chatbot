@@ -46,8 +46,7 @@ useEffect(()=>{
       
     }
 
-    
-
+// eslint-disable-next-line
 },[selectedChat,tempItem])
 
 useEffect(() => {

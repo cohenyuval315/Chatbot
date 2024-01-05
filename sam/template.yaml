@@ -10,7 +10,7 @@ Metadata:
     SpdxLicenseId: Apache-2.0
     LicenseUrl: LICENSE.txt
     ReadmeUrl: README.md
-    Labels: ['tests']
+    Labels: ['Chatbot','LLM','ML','Serverless','AWS Lambda','Localstack','AWS SAM','HuggingFace','REST API']
     HomePageUrl: https://github.com/cohenyuval315/Chatbot
     SemanticVersion: 0.0.1
     SourceCodeUrl: https://github.com/cohenyuval315/Chatbot

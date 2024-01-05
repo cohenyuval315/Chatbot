@@ -154,17 +154,7 @@ class APIClient {
 }
 
 const client = (function() {
-  let host = "http://localhost"
-  let port = 3001
-  let base_url = `${host}:${port}`;
-  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
-    // proxy
-    // base_url = ""
-  } else {
-    
-  }
-  
-  
+  let base_url = `${process.env.REACT_APP_HOST_ENDPOINT}:${process.env.REACT_APP_PORT_ENDPOINT}`;
   const api_client = new APIClient(base_url);
   return api_client;
 })();

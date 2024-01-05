@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import ChatBoxInput from "./ChatInput/ChatInput";
 import IntroSection from "./IntroSection";
 import {useChat} from '../../contexts/ChatContext'

@@ -1,0 +1,23 @@
+FROM node:14-alpine
+
+
+ARG REACT_APP_HOST
+ARG REACT_APP_PORT
+ARG REACT_APP_HOST_ENDPOINT
+ARG REACT_APP_PORT_ENDPOINT
+
+ENV NODE_ENV production
+
+WORKDIR /app
+COPY package*.json ./
+
+RUN npm install
+COPY . . 
+
+RUN chmod +x create-env-file.sh
+RUN sh create-env-file.sh REACT_APP_HOST_ENDPOINT=$REACT_APP_HOST_ENDPOINT REACT_APP_PORT_ENDPOINT=$REACT_APP_PORT_ENDPOINT
+
+RUN npm run build
+RUN npm install -g serve
+
+ENTRYPOINT ["sh", "-c", "serve -s build"]

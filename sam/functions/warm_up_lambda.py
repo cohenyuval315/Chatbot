@@ -1,5 +1,4 @@
 from aws_lambda_powertools.logging import correlation_paths
-import json
 from deps import *
 from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
 from typing import Callable
@@ -19,8 +18,8 @@ def error_handler(handler, event, context) -> Callable:
 
 def bucket_creations():
     try:
-        if BUCKET_PER_MODEL is False:
-            create_bucket(BUCKET_NAME)
+        if SystemConfig.BUCKET_PER_MODEL is False:
+            create_bucket(SystemConfig.BUCKET_NAME)
         else:
             for b_name in get_models_buckets_names():
                 create_bucket(b_name)
@@ -33,8 +32,12 @@ def bucket_creations():
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event, context):
+    logger.info('starting warm up function...')
+    logger.info('creating tables...')
     db_manager.create_tables()
+    logger.info('creating buckets...')
     bucket_creations()
+    logger.info('downloading and uploading models...')
     ModelsManager.upload_all_models()
     return make_lambda_message_response(200,"warm up success!")
 

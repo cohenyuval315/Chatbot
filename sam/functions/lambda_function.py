@@ -17,7 +17,7 @@ from typing import Callable
 import time
 from deps import *
 
-@app.get("/hello",cors=CORS)
+@app.get("/hello",cors=SystemConfig.CORS)
 @tracer.capture_method
 def hello() -> Response:
     # adding custom metrics
@@ -28,14 +28,14 @@ def hello() -> Response:
     return make_lambda_message_response(200,"hello world")
 
 
-@app.get("/c",cors=CORS)
+@app.get("/c",cors=SystemConfig.CORS)
 @tracer.capture_method
 def chats() -> Response:
     metrics.add_metric(name="ChatsInvocations", unit=MetricUnit.Count, value=1)
     chats_data = db_manager.get_all_chats()
     return make_lambda_data_response(chats_data)
 
-@app.get("/cl",cors=CORS)
+@app.get("/cl",cors=SystemConfig.CORS)
 @tracer.capture_method
 def chats_with_logs() -> Response:
     metrics.add_metric(name="ChatsInvocations", unit=MetricUnit.Count, value=1)
@@ -44,7 +44,7 @@ def chats_with_logs() -> Response:
 
 
 
-@app.post("/c",cors=CORS)
+@app.post("/c",cors=SystemConfig.CORS)
 @tracer.capture_method
 def new_chat() -> Response:
     metrics.add_metric(name="NewChatInvocations", unit=MetricUnit.Count, value=1)
@@ -72,7 +72,7 @@ def new_chat() -> Response:
                 
     return make_lambda_error_response(500)
 
-@app.delete("/c/<chat_id>",cors=CORS)
+@app.delete("/c/<chat_id>",cors=SystemConfig.CORS)
 @tracer.capture_method
 def delete_chat(chat_id:str) -> Response:
     metrics.add_metric(name="DeleteChatsInvocations", unit=MetricUnit.Count, value=1)
@@ -82,7 +82,7 @@ def delete_chat(chat_id:str) -> Response:
     logger.error(f"failed to delete chat: error {res}")
     return make_lambda_error_response(500)
 
-@app.get("/c/<chat_id>",cors=CORS)
+@app.get("/c/<chat_id>",cors=SystemConfig.CORS)
 @tracer.capture_method
 def chat(chat_id: str) -> Response:
     metrics.add_metric(name="ChatInvocations", unit=MetricUnit.Count, value=1)
@@ -92,7 +92,7 @@ def chat(chat_id: str) -> Response:
     return make_lambda_message_response(404,"Chat Does Not Exists")
 
     
-@app.put("/c/<chat_id>",cors=CORS)
+@app.put("/c/<chat_id>",cors=SystemConfig.CORS)
 @tracer.capture_method
 def converse(chat_id: str) -> Response:
     metrics.add_metric(name="ConverseInvocations", unit=MetricUnit.Count, value=1)
@@ -115,7 +115,7 @@ def converse(chat_id: str) -> Response:
 
 
 
-@app.get("/m",cors=CORS)
+@app.get("/m",cors=SystemConfig.CORS)
 def get_models() -> Response:
     available_options =[modelConf.to_user_json() for modelConf in  MODEL_AVAILABLE_OPTIONS]
     return make_lambda_data_response(available_options)

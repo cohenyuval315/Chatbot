@@ -1,4 +1,4 @@
-import os
+
 import dataclasses
 from .config import *
 from typing import Optional
@@ -60,20 +60,6 @@ class LLMConfiguration:
     
 
 
-class SystemConfig:
-    STAGE = os.getenv("STAGE", "Dev")
-    NAMESPACE = os.getenv("POWERTOOLS_METRICS_NAMESPACE", "ServerlessConversation")
-    CORS = True
-    BUCKET_NAME = "chatbot-bucket"
-    BUCKET_NAME_PREFIX = "bucket"
-    BUCKET_PER_MODEL = False
-    DELETE_DYNAMO_DATA=False
-    DELETE_DYNAMO_TABLES=False 
-    OVERWRITE_MODELS = False
-
-
-system_config = SystemConfig()
-
 flan_t5_small = LLMConfiguration(
     model_name="google/flan-t5-small",
     model_key="flan_t5_small",
@@ -98,6 +84,15 @@ MODEL_OPTIONS = [
     flan_t5_small,
     flan_t5_base
 ]
+
+MODEL_AVAILABLE_OPTIONS_INDEXES = [0,1]
+MODEL_AVAILABLE_OPTIONS = []
+for model_option_index in MODEL_AVAILABLE_OPTIONS_INDEXES:
+    MODEL_AVAILABLE_OPTIONS.append(MODEL_OPTIONS[model_option_index])
+
+
+OVERWRITE_MODELS = False
+
 
 
 
