@@ -264,7 +264,6 @@ class DynamoDB(SingletonBase):
         self.chats_logs.delete_table()
         self.chats.delete_table()
 
-
     def add_new_chat(self, title:str):
         return self.chats.create_chat(title)
 
@@ -296,8 +295,6 @@ class DynamoDB(SingletonBase):
             }            
             return chat_details
         
-        
-
     def delete_chat(self,chat_id:str):
         logs_deleted = self.chats_logs.delete_chat_logs(chat_id)
         if logs_deleted:

@@ -1,3 +1,4 @@
 cd ../
-samlocal validate 
-samlocal build
+sam validate
+echo 'building...'
+sam build

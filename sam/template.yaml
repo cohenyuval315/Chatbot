@@ -29,8 +29,11 @@ Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/devel
       MaxAge: "'600'"
 
   Function:
-    # Architectures:
-    # - x86_64
+    Architectures:
+    - x86_64
+    Tracing: Active
+    Tags:
+      LambdaPowertools: python
     Timeout: 600
     MemorySize: 2048
     Runtime: python3.9
@@ -43,6 +46,7 @@ Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/devel
         POWERTOOLS_DEV: 'true'
         POWERTOOLS_DEBUG: 'true'
         POWERTOOLS_LOGGER_LOG_EVENT : 'true'
+        
 
 Resources:
 
@@ -58,9 +62,6 @@ Resources:
       Handler: lambda_function.lambda_handler
       CodeUri: functions
       Description: conversation with chatbot
-      Architectures:
-      - x86_64
-      Tracing: Active
       Events: 
         HelloPath:
           Type: Api           
@@ -110,12 +111,7 @@ Resources:
             Path: /{proxy+}
             Method: OPTIONS                       
 
-
-      Tags:
-        LambdaPowertools: python
-
   WarmUpFunction:
-
     Type: AWS::Serverless::Function   
     Properties:
       Timeout: 6000
@@ -123,37 +119,26 @@ Resources:
       Handler: warm_up_lambda.lambda_handler 
       CodeUri: functions 
       Description: initialize the application
-      Architectures:
-      - x86_64
-      Tracing: Active
       Events:
         YourEvent:
           Type: Api
           Properties:
             Path: /start
             Method: GET 
-      Tags:
-        LambdaPowertools: python
-  
+
   CoolDownFunction:
     Type: AWS::Serverless::Function   
     Properties:
       Handler: cool_down_lambda.lambda_handler 
       CodeUri: functions 
       Description: clean-up function
-      Architectures:
-      - x86_64
-      Tracing: Active
       Events:
         YourEvent:
           Type: Api
           Properties:
             Path: /stop
             Method: GET 
-      Tags:
-        LambdaPowertools: python
 
-      
 
 
   ApplicationResourceGroup:

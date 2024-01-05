@@ -1,9 +1,13 @@
 An Interactive Serverless chat bot react web application based on huggingface LLM models, built with localstack aws features which includes apigateway , lambdas , s3 , dynamodb and AWS SAM.
 
 
-## start serverless:
+- make sure docker service is running
+
+recommds using unix , cloud formation very slow on wsl2
+## start serverless (unix/wsl2):
 ```code
 cd ./sam/scripts/
+dos2unix start_localstack.sh
 ./start_localstack.sh
 ./build
 ./start
@@ -12,6 +16,7 @@ cd ./sam/scripts/
 ## start react:
 ```code
 cd web
+npm install
 npm start
 ```
 

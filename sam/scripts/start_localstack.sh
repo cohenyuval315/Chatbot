@@ -1,10 +1,15 @@
+
+echo 'initlizing localstack...'
+echo 'stoping existing localstack instances...'
 localstack stop >/dev/null 2>&1
 
-# create network if not exists
 
+echo 'create localstack network if not exists...'
 DOCKER_NETWORK=localstack-network
 docker network inspect $DOCKER_NETWORK >/dev/null 2>&1 || \ 
 docker network create --driver bridge $DOCKER_NETWORK
+
+
 
 
 # DOCKER_HOST=unix:///var/run/docker.sock

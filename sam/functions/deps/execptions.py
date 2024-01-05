@@ -23,7 +23,6 @@ class ServerlessException(ExceptionBase):
         base_default_message = default_message if default_message else "Serverless Error"
         super().__init__(base_default_message, message, debug, verbose)
 
-
 class LLMError(ServerlessException):
     def __init__(self, message=None, debug=None, verbose: bool = True):
         default_message = "LLM Error"
@@ -33,6 +32,7 @@ class LLMUploaderError(ServerlessException):
     def __init__(self, message=None, debug=None, verbose: bool = True):
         default_message = "LLM Uploader Error"
         super().__init__(default_message, message, debug, verbose)
+
 class LLMLoaderError(ServerlessException):
     def __init__(self, message=None, debug=None, verbose: bool = True):
         default_message = "LLM Loader Error"
@@ -43,9 +43,6 @@ class LLMCleanUpError(ServerlessException):
         default_message = "LLM Clean Up Error"
         super().__init__(default_message, message, debug, verbose)
 
-
-
-
 class ModelsManagerError(ServerlessException):
     def __init__(self, default_message: str, message=None, debug=None, verbose: bool = True):
         super().__init__(default_message, message, debug, verbose)
@@ -53,9 +50,6 @@ class ModelsManagerError(ServerlessException):
 class DynamoDBError(ServerlessException):
     def __init__(self, default_message: str, message=None, debug=None, verbose: bool = True):
         super().__init__(default_message, message, debug, verbose)
-
-
-
 
 class ClientException(ExceptionBase):
     def __init__(self, default_message=None, message=None, debug=None, verbose: bool = True):
