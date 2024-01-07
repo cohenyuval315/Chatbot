@@ -25,7 +25,7 @@ const NavChatList = () => {
         
     },[chats]);
 
-    console.log(chats)
+    
 
     return (
         <div className={"navPromptWrapper"}  style={{}}>

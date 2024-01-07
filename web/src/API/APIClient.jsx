@@ -49,7 +49,7 @@ class APIClient {
 
     async _request(method,endpoint, body = null) {
       const url = `${this.base_url}${endpoint}`;
-      console.info(`${method} - ${url}`);
+      // console.info(`${method} - ${url}`);
       const requestOptions = {
         method: method,
         headers: {

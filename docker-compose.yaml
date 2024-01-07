@@ -11,8 +11,6 @@ services:
       - EAGER_SERVICE_LOADING=0
       - LOCALSTACK-CLI=1
       - ACTIVE_PRO=0
-
-      - LAMBDA_DOCKER_FLAGS=-e TEST_LAMBDA_ENV_VAR=VALUE
       - SERVICES=s3,lambda,dynamodb,apigateway,iam,cloudwatch,cloudformation
       - SET_TERM_HANDLER=1
       - AWS_DEFAULT_REGION=eu-west-3
@@ -25,8 +23,6 @@ services:
       - HOSTNAME_FROM_LAMBDA=localstack-main
       - LOCALSTACK_HOST=localstack-main
       - MAIN_CONTAINER_NAME=localstack-main
-      # - LAMBDA_REMOVE_CONTAINERS=0
-      # - LAMBDA_RUNTIME_EXECUTOR=docker
       - SAM_CLI_TELEMETRY=0
     volumes:
       - /home/yuval/.cache/localstack/volume:/var/lib/localstack
