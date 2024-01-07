@@ -53,8 +53,8 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true    
-    # volumes:  during development fast reloading
-    #   - ./web/node_modules:/app/node_modules
+    # volumes: #  during development fast reloading
+    #   - /app/node_modules
     #   - ./web:/app
     ports:
       - 3000:3000

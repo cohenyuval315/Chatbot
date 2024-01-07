@@ -1,5 +1,5 @@
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect,useReducer,  useState } from 'react';
 import client from '../API/APIClient';
 
 
@@ -21,12 +21,35 @@ export const introChat = {
   "log":[]
 }
 
-
+function chatsReducer(state,action){
+  switch (action.type){
+    case 'set':{
+      return action.data
+    }
+    case 'add':{
+      return [action.chat,...state]
+    }
+    case 'update':{
+      return state.map((item)=>{
+          if(item.chat_id === action.chat.chat_id){
+            return action.chat;
+          }
+          return item;
+        });
+    }
+    case 'delete':{
+      return state.filter((item)=>item.chat_id !== action.chat_id);
+    }
+    default :{
+      break;
+    }
+  }
+} 
 
 
 
 export function ChatProvider({ children }) {
-  const [chats, setChats] = useState(null);
+  const [chats,dispatch] = useReducer(chatsReducer,null);
   const [selectedChat, setSelectedChat] = useState(introChat);
   const [tempItem,setTempItem] = useState(null);
   
@@ -58,11 +81,18 @@ export function ChatProvider({ children }) {
     }
   },[])
 
+  const setChatsData = async (data) => {
+
+    dispatch({
+      type:'set',
+      data:data
+    })
+  }
 
   const fetchChats = useCallback(async () => {
     try {
       const data = await client.getChats()
-      setChats(data);
+      setChatsData(data);
       setError(false);
       return data;
     } catch (error) {
@@ -73,43 +103,44 @@ export function ChatProvider({ children }) {
 
 
   useEffect(()=>{
-        
     const fetchData = async () => {
       await fetchModelOptions().then((data)=>{
         setLoading(false);
       })      
       await fetchChats().then((data)=>{
         setChatsLoading(false);
+        
       })
-
-      
-      // try {
-      //   await Promise.all([fetchModelOptions(), fetchChats()]);
-      //   setLoading(false);
-      // } catch (error) {
-      //   console.error('Error fetching data:', error);
-      // }
     };
 
     fetchData();
-    
-
-  }, [fetchModelOptions, fetchChats]);
-
+  }, []);
 
 
   const onModelSelect = (modelOption) => {
     setSelectedModelOption(modelOption);
   }
 
-
   const createNewChat = async (prompt) => {
     try {
+      setSelectedChatLoading(true);
       const data = await client.createNewChat(prompt,selectedModelOption['model_name']);
+      setSelectedChatLoading(false);
       setError(false);
       return data;
     } catch (error){
       setError(error);
+    }
+  }
+
+  const deleteChat = async () => {
+    if(selectedChat.chat_id !== null && selectedChat.chat_id !== -1){
+      dispatch({
+        type:'delete',
+        chat_id:selectedChat.chat_id
+      })
+      setSelectedChat(newChat)
+      await client.deleteChat(selectedChat.chat_id);
     }
   }
 
@@ -137,17 +168,14 @@ export function ChatProvider({ children }) {
 
   const onMessageNewChat = async (prompt) => {
     const item = await createNewChat(prompt,selectedModelOption['model_name']);
-    const data = item;
-    if (item){
-      
-      const selected = await onChatSelect(data);
-      if (selected){
-        const items = await fetchChats();
-        if (items){
 
-        }else{
-          console.error("could not update chats items");
-        }
+    if (item){
+      dispatch({
+        type:'add',
+        chat:item
+      })
+      const selected = await onChatSelect(item);
+      if (selected){
 
       }else{
         console.error("could not select new chat");
@@ -168,16 +196,10 @@ export function ChatProvider({ children }) {
 
   }
 
-  const deleteSelectedChat = async (chat_id) => {
-    await client.deleteChat(chat_id);
-    setSelectedChat(newChat)
-    await fetchChats()
-  }
-
   const handleInputSubmit = async (prompt) => {
     let res = null;
     if (!selectedChat){
-      console.log("handleInputSubmit:Should Not Be Here...")
+      console.error("handleInputSubmit:Should Not Be Here...")
       return
     }
     const temp = {
@@ -219,7 +241,7 @@ export function ChatProvider({ children }) {
       onChatConverse,
       onMessageNewChat,
       handleInputSubmit,
-      deleteSelectedChat
+      deleteChat
        }}>
       {children}
     </ChatContext.Provider>

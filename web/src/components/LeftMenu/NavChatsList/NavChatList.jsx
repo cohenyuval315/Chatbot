@@ -1,48 +1,42 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState,useRef } from "react";
 import NavChat from "./NavChat";
 import NewNavChat from "./NewNavChat";
 import { useChat } from "../../../contexts/ChatContext";
 
 const NavChatList = () => {
     const {chats} = useChat()
-    const [currentChats,setCurrentChats] = useState(null);
+    const [newChatID,setNewChatID] = useState(null)
     
+    const prevChats = useRef(chats);
 
-    useEffect(() => {
-        if(!chats){
-            setCurrentChats(null);
-            return
-        }
-        if (!Array.isArray(chats)){
+    useEffect(()=>{
+        if(chats === null){
             return;
         }
-
-        if (currentChats === null){
-            const initialChats =  chats.map((chat)=>({...chat,new:false}));
-            setCurrentChats(initialChats);
-            return;
+        if(chats !== null && prevChats.current !== null){
+            if(chats.length > prevChats.length){
+                const ids = prevChats.current.map((item)=>item.id);
+                const ncc = chats.filter((item)=>!ids.includes(item.id))[0].id;
+                const nc = chats[chats.length - 1].id;
+                setNewChatID(ncc);
+            }
         }
+        prevChats.current = chats;
+        
+    },[chats]);
 
-        const isNewChat = currentChats.length !== chats.length;    
-        if (isNewChat) {
-            const newChats = chats.map((chat) => ({ ...chat, new: !currentChats.find((c) => c.id === chat.id) }));
-            setCurrentChats(newChats);
-        }
-      }, [chats,currentChats]);
-
+    console.log(chats)
 
     return (
-        <>
-            <div className={"navPromptWrapper"}  style={{}}>
-                {currentChats&&Array.isArray(currentChats)&&currentChats.map((c, index) => (
-                    c.new === true ? (
-                        <NewNavChat chat={c} key={`chat_${index}`} />
-                    ) : (
-                        <NavChat chat={c} key={`chat_${index}`} />
-                    )
-                ))}
-            </div>
-        </>
+        <div className={"navPromptWrapper"}  style={{}}>
+            {chats&&Array.isArray(chats)&&chats.map((c, index) => (
+                newChatID !== null && c.id === newChatID ? (
+                    <NewNavChat chat={c} key={`chat_${index}`} />
+                ) : (
+                    <NavChat chat={c} key={`chat_${index}`} />
+                )
+            ))}
+        </div>
     );
 }
 export default NavChatList;
