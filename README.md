@@ -9,7 +9,7 @@ This project introduces an Interactive Serverless Chat Bot web application power
 - React Web
 - Python-based Lambdas using Lambda Power Tools
 - Hugging Face Transformers
-- AWS LocalStack featuring Lambda, API Gateway, S3, SAM/CloudFormation, DynamoDB
+- AWS LocalStack featuring Lambda, API Gateway REST, S3, SAM/CloudFormation, DynamoDB
 
 ## Development Timeline
 
