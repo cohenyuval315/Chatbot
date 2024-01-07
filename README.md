@@ -1,7 +1,7 @@
 # Project Overview
 
 ## Interactive Serverless Chat Bot Application
-This project introduces an innovative Interactive Serverless Chat Bot web application powered by LLM models from Hugging Face, designed to engage users through dynamic conversations.
+This project introduces an Interactive Serverless Chat Bot web application powered by LLM models from Hugging Face, designed to engage users through dynamic conversations.
 
 <strong>READ ME: </strong> Scroll down to discover how to start the chatbot, and view the architecture images, application snapshots and videos showcasing the chatbot.
 
